@@ -1,26 +1,33 @@
-import Logger from "../../util/logger.js";
+import Logger from "../../util/logger";
+import {firestore} from "firebase";
+import {User} from "../models/models";
 
 const L = new Logger('UserDb');
 
 export default class UsersDb {
 
-  constructor(db) {
+  db: firestore.Firestore;
+
+  constructor(db: firestore.Firestore) {
     this.db = db
   }
 
-  getById = async (id) => {
+  getById = async (id: string) => {
     L.i(`getById - ${id}`)
     const doc = await this.users().doc(id).get();
     if (doc.exists) {
+      const {azureProfileId, name, email} =  doc.data()
       return {
         id: doc.id,
-        ...doc.data()
+        azureProfileId,
+        name,
+        email
       };
     }
     return null;
   }
 
-  getByAzureProfileId = async (azureProfileId) => {
+  getByAzureProfileId = async (azureProfileId: string): Promise<User> => {
     L.i(`getByAzureProfileId - ${azureProfileId}`)
     const result = await this.users().where("azureProfileId", "==", azureProfileId).get()
 
@@ -28,27 +35,34 @@ export default class UsersDb {
       return null
     }
 
+    const {name, email} = result.docs[0].data()
+
     return {
       id: result.docs[0].id,
-      ...result.docs[0].data()
+      azureProfileId,
+      name,
+      email
     };
   }
 
-  add = async (user) => {
+  add = async (user: User) : Promise<User> => {
     L.i(`add - ${user.email}`)
     const docRef = await this.users().add(user)
     const snapshot = await docRef.get()
+    const {azureProfileId, name, email} = snapshot.data()
     return {
       id: snapshot.id,
-      ...snapshot.data()
+      azureProfileId,
+      name,
+      email,
     };
   }
 
-  delete = async (id) => {
+  delete = async (id: string) => {
     L.i(`delete - ${id}`)
     const user = await this.users().doc(id).get();
     if (user.exists) {
-      await user.delete()
+      //await user.delete()
     }
   }
 

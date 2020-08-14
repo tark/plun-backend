@@ -1,14 +1,17 @@
-import Logger from "../util/logger.js";
+import Logger from "../util/logger";
+import * as NodeCache from "node-cache";
 
 const L = new Logger('Cache');
 
 export default class Cache {
 
-  constructor(cache) {
+  cache: NodeCache;
+
+  constructor(cache : NodeCache) {
     this.cache = cache;
   }
 
-  setTeamId = (teamId) => {
+  setTeamId = (teamId: string) => {
     this.set('team_id', teamId)
   }
 
@@ -16,7 +19,7 @@ export default class Cache {
     return this.get('team_id')
   }
 
-  setProjectId = (projectId) => {
+  setProjectId = (projectId: string) => {
     this.set('project_id', projectId)
   }
 
@@ -24,7 +27,7 @@ export default class Cache {
     return this.get('project_id')
   }
 
-  setOrganization = (organization) => {
+  setOrganization = (organization: string) => {
     this.set('organization', organization)
   }
 
@@ -32,21 +35,21 @@ export default class Cache {
     return this.get('organization')
   }
 
-  setToken = (userId, token) => {
+  setToken = (userId: string, token: string) => {
     L.i(`setToken - ${userId}`)
     this.set(`token_${userId}`, token)
   }
 
-  getToken = (userId) => {
+  getToken = (userId: string): string => {
     L.i(`getToken - ${userId}`)
     return this.get(`token_${userId}`)
   }
 
-  set = (id, value) => {
+  set = (id: string, value: string | number) => {
     this.cache.set(id, value)
   }
 
-  get = (id) => {
+  get = (id: string): string => {
     return this.cache.get(id)
   }
 

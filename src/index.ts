@@ -1,15 +1,14 @@
 import express from "express";
-import UsersController from "./controllers/users_controller.js";
+import UsersController from "./controllers/users_controller";
 import cors from 'cors'
-import dotenv from 'dotenv'
-import firebase from 'firebase';
-import TasksRepository from "./repository/tasks_repository.js";
-import Cache from "./repository/cache.js";
+import * as dotenv from 'dotenv'
+import * as firebase from 'firebase';
+import TasksRepository from "./repository/tasks_repository";
+import Cache from "./repository/cache";
 import NodeCache from "node-cache";
-import AzureApi from "./repository/api/azure_api.js";
-import UsersRepository from "./repository/users_repository.js";
-import {UnauthorizedError} from "./unauthorized_error.js";
-import Logger from "./util/logger.js";
+import AzureApi from "./repository/api/azure_api";
+import {UnauthorizedError} from "./unauthorized_error";
+import Logger from "./util/logger";
 
 const L = new Logger('index');
 
@@ -28,10 +27,7 @@ const nodeCache = new NodeCache();
 const cache = new Cache(nodeCache);
 const azureApi = new AzureApi(cache);
 
-const tasksRepository = new TasksRepository(db);
-const usersRepository = new UsersRepository(db);
-const usersController = new UsersController(cache, usersRepository, azureApi);
-const tasksController = new UsersController(cache, tasksRepository);
+const usersController = new UsersController(db, cache, azureApi);
 
 dotenv.config()
 
@@ -55,6 +51,7 @@ app.post('/auth', async (req, res, next) => {
     const user = await usersController.auth(userId);
     await res.status(200).json(user)
   } catch (e) {
+    L.e(`route /auth - ${e}`)
     if (e instanceof UnauthorizedError) {
       res.status(401)
     } else {
@@ -75,9 +72,10 @@ app.post('/auth-by-code', async (req, res, next) => {
   try {
     const {code} = req.body;
     const user = await usersController.authByCode(code);
-    await res.status(200).json(user);
+    L.i(`route /auth-by-code - return user - ${JSON.stringify(user)}`)
+    await res.send(user);
   } catch (e) {
-    L.i(`error - ${e}`)
+    L.e(`route /auth-by-code - ${e}`)
     if (e instanceof UnauthorizedError) {
       res.status(401)
     } else {
@@ -91,6 +89,16 @@ app.get("/tasks", async (req, res, next) => {
 
   L.i(`route test`)
   res.status(200).send()
+
+});
+
+app.get("/organizations", async (req, res, next) => {
+
+
+});
+
+app.get("/projects", async (req, res, next) => {
+
 
 });
 

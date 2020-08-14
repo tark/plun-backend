@@ -1,31 +1,35 @@
-import NodeCache from "node-cache";
-import {UnauthorizedError} from "../../unauthorized_error.js";
+import {UnauthorizedError} from "../../unauthorized_error";
 import axios from "axios";
 import qs from "qs";
-import Logger from "../../util/logger.js";
+import Logger from "../../util/logger";
+import Cache from "../cache";
+import {Organization, Project} from "../models/models";
 
 const L = new Logger('AzureApi');
-const baseApiUrl = 'https://app.vssps.visualstudio.com'
-const baseApiUrlAzure = 'https://dev.azure.com'
+const baseUrl = 'https://app.vssps.visualstudio.com'
+const baseUrlDevAzure = 'https://dev.azure.com'
 const Endpoints = {
-  token: `${baseApiUrl}/oauth2/token`,
-  accounts: `${baseApiUrl}/_apis/accounts`,
-  profile: `${baseApiUrl}/_apis/profile/profiles/me`,
+  token: `${baseUrl}/oauth2/token`,
+  accounts: `${baseUrl}/_apis/accounts`,
+  profile: `${baseUrl}/_apis/profile/profiles/me`,
+  projects: `${baseUrl}/_apis/projects`,
 }
 
 const callbackUrl = 'https://dev.plun.io:3000/azure-auth-callback'
 
 export default class AzureApi {
 
-  constructor(cache) {
+  cache: Cache;
+
+  constructor(cache: Cache) {
     this.cache = cache;
   }
 
   /**
    * Retrieve the azure token by the given authorization code
    */
-  getAccessToken = async (authCode) => {
-    L.i(`getAccessToken - ${authCode}`)
+  getAccessToken = async (authCode: string) => {
+    L.i(`getAccessToken`)
     try {
       const result = await axios.post(
         Endpoints.token,
@@ -55,7 +59,7 @@ export default class AzureApi {
    */
   refreshToken = async () => {
     L.i(`refreshToken`)
-    const refreshToken = new NodeCache().get('refresh_token');
+    const refreshToken = this.cache.get('refresh_token');
 
     if (!refreshToken) {
       return;
@@ -67,7 +71,8 @@ export default class AzureApi {
       }
     }
 
-    const data = {
+    // todo implement it
+    /*const data = {
       'client_assertion_type': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
       'client_assertion': encodeURI(clientSecret),
       'grant_type': 'refresh_token',
@@ -75,38 +80,39 @@ export default class AzureApi {
       'redirect_uri': callbackUrl,
     }
 
-    const result = await axios.post(url, qs.stringify(data), config);
+    const result = await axios.post(url, qs.stringify(data), config);*/
 
   }
 
   /**
    * Returns first 20 tasks suits the given query
    */
-  getTasks = async (query) => {
+  getTasks = async (query: string,
+                    organizationName: string,
+                    projectName: string,
+                    teamId: string,
+                    userId: string) => {
     L.i(`getTasks - ${query}`)
     try {
-      const organization = this.getOrganization();
-      const projectId = this.getProjectId();
-      const teamId = this.getTeamId();
 
-      L.i(`getTasks - ${baseApiUrlAzure}/${organization}/${projectId}/${teamId}/_apis/wit/wiql`)
+      L.i(`getTasks - ${baseUrlDevAzure}/${organizationName}/${projectName}/${teamId}/_apis/wit/wiql`)
 
       const result = await axios.post(
-        `${baseApiUrlAzure}/${organization}/${projectId}/${teamId}/_apis/wit/wiql`,
+        `${baseUrlDevAzure}/${organizationName}/${projectName}/${teamId}/_apis/wit/wiql`,
         {query: `SELECT * FROM WorkItems WHERE [Title] CONTAINS '${query}'`},
-        this.apiConfig()
+        this.apiConfig(userId)
       );
 
       L.i(`getTasks - ${JSON.stringify(result.data, null, 2)}`)
 
-      const ids = result.data.workItems.map(i => i.id)
+      const ids = result.data.workItems.map((i : any) => i.id)
 
       // GET https://dev.azure.com/{organization}/{project}/_apis/wit/workitems?ids={ids}&api-version=5.1
 
       const result1 = await axios.get(
-        `${baseApiUrlAzure}/${organization}/${projectId}/_apis/wit/workitems`,
+        `${baseUrlDevAzure}/${organizationName}/${projectName}/_apis/wit/workitems`,
         //{query: `SELECT * FROM WorkItems WHERE [Title] CONTAINS '${query}'`},
-        this.apiConfig(
+        this.apiConfig(userId,
           {
             ids: ids.join(','),
             fields: 'System.Title',
@@ -129,20 +135,56 @@ export default class AzureApi {
   /**
    * Returns the current user based on current auth token
    */
-  getProfile = async (token) => {
+  getProfile = async (token: string) => {
     L.i(`getProfile`)
     try {
       const result = await axios.get(Endpoints.profile, {headers: this.authHeader(token)});
       L.i(`getProfile - ${JSON.stringify(result.data, null, 2)}`)
       return result.data;
     } catch (e) {
-      L.i(`getProfile - error - ${e}`)
+      L.e(`getProfile - error - ${e}`)
       return null;
     }
 
   }
 
-  getProjects = async () => {
+  getOrganizations = async (token: string): Promise<Array<Organization>> => {
+    L.i(`getOrganizations`)
+    try {
+      const result = await axios.get(Endpoints.accounts, {headers: this.authHeader(token)});
+      L.i(`getOrganizations - ${JSON.stringify(result.data, null, 2)}`)
+      return result.data.map((o: any) => ({
+        id: '',
+        azureId: o.AccountId,
+        name: o.AccountName
+      }));
+    } catch (e) {
+      L.e(`getOrganizations - error - ${e}`)
+      return null;
+    }
+  }
+
+  getProjects = async (organization: string, token: string): Promise<Array<Project>> => {
+    L.i(`getProjects - ${organization}`)
+    L.i(`getProjects - ${baseUrlDevAzure}/${organization}/_apis/projects`)
+    L.i(`getProjects - -----------`)
+    try {
+      const result = await axios.get(
+        `${baseUrlDevAzure}/${organization}/_apis/projects`,
+        {headers: this.authHeader(token)},
+      );
+      L.i(`getProjects - ${JSON.stringify(result.data, null, 2)}`)
+      return result.data.value.map((e: any) => ({
+        azureId: e.id,
+        name: e.name,
+      }));
+    } catch (e) {
+      L.e(`getProjects - error - ${e}`)
+      return null;
+    }
+  }
+
+  /*getProjects = async () => {
     L.i(`getProjects`)
     try {
       const organization = this.getOrganization();
@@ -167,9 +209,9 @@ export default class AzureApi {
     } catch (e) {
       L.i(`getTeams - ${e}`)
     }
-  }
+  }*/
 
-  apiConfig = (userId, params) => {
+  apiConfig = (userId: string, params?: Object) => {
     return {
       headers: {
         'Authorization': `Bearer ${this.accessToken(userId)}`,
@@ -181,7 +223,7 @@ export default class AzureApi {
     }
   }
 
-  apiConfigTokenOnly = (userId) => {
+  apiConfigTokenOnly = (userId: string) => {
     return {
       headers: {
         'Authorization': `Bearer ${this.accessToken(userId)}`,
@@ -189,7 +231,7 @@ export default class AzureApi {
     }
   }
 
-  accessToken = (userId) => {
+  accessToken = (userId: string) => {
     const token = this.cache.getToken(userId)
     L.i(`accessToken - ${token}`)
     if (!token) {
@@ -198,7 +240,7 @@ export default class AzureApi {
     return token
   }
 
-  authHeader = (token) => {
+  authHeader = (token: string) => {
     return {
       'Authorization': `Bearer ${token}`,
     }

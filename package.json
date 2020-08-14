@@ -1,9 +1,14 @@
 {
   "name": "plun-backend",
   "version": "1.0.0",
-  "main": "app.js",
-  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
   "dependencies": {
+    "@types/cors": "^2.8.7",
     "axios": "^0.19.2",
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",
@@ -11,13 +16,16 @@
     "express": "^4.17.1",
     "firebase": "^7.17.1",
     "node-cache": "^5.1.2",
-    "qs": "^6.9.0"
+    "qs": "^6.9.0",
+    "chalk": "^4.1.0"
   },
   "devDependencies": {
     "axios": "^0.19.0",
-    "supports-color": "^7.1.0"
-  },
-  "scripts": {
-    "start": "node src/index.js"
+    "supports-color": "^7.1.0",
+    "@types/express": "^4.17.2",
+    "@types/node": "^13.1.2",
+    "nodemon": "^2.0.2",
+    "ts-node": "^8.5.4",
+    "typescript": "^3.7.4"
   }
 }

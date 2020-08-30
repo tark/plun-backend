@@ -22,8 +22,14 @@ export type Project = {
 export type Task = {
   id: string;
   name: string;
-  url: string;
-  state: string;
+  state: TaskState;
+  plannedAt: number;
+  azureId?: number;
+  azureName?: string;
+  azureState?: TaskState;
+  azureUrl?: string;
 };
+
+export type TaskState = 'created' | 'done' | 'progress' | 'failed' | 'cancelled'
 
 

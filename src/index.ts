@@ -9,6 +9,8 @@ import NodeCache from "node-cache";
 import AzureApi from "./repository/api/azure_api";
 import {UnauthorizedError} from "./unauthorized_error";
 import Logger from "./util/logger";
+import {Express} from "express";
+import TasksController from "./controllers/tasks_controller";
 
 const L = new Logger('index');
 
@@ -28,14 +30,36 @@ const cache = new Cache(nodeCache);
 const azureApi = new AzureApi(cache);
 
 const usersController = new UsersController(db, cache, azureApi);
+const tasksController = new TasksController(db, cache, azureApi);
 
 dotenv.config()
 
-const app = express();
+const app: Express = express();
 app.use(cors());
 app.use(express.urlencoded({extended: true}));
 app.use(express.json());
 app.listen(3001, () => console.log("Server running on port 3001"));
+
+app.get('/profile', async (req, res, next) => {
+
+  L.i(`route /profile`)
+
+  try {
+    // as any because of this
+    // https://www.reddit.com/r/expressjs/comments/gz37m4/reqquery_and_typescript_parsedqs/
+    const {token} = req.query as any;
+    const profile = await usersController.getProfile(token);
+    res.status(200).send(profile)
+  } catch (e) {
+    L.e(`route /projects - ${e}`)
+    if (e instanceof UnauthorizedError) {
+      res.status(401)
+    } else {
+      next(e)
+    }
+  }
+
+})
 
 /**
  * First of all user try to auth just by id
@@ -65,15 +89,20 @@ app.post('/auth', async (req, res, next) => {
  * Frontend should call this if it has no userId,
  * or if the previous try to auth by token returned 401 unauthorized error.
  */
-app.post('/auth-by-code', async (req, res, next) => {
+app.post('/token', async (req, res, next) => {
 
-  L.i(`route /auth-by-code`)
+  L.i(`route /token`)
 
   try {
-    const {code} = req.body;
-    const user = await usersController.authByCode(code);
-    L.i(`route /auth-by-code - return user - ${JSON.stringify(user)}`)
-    await res.send(user);
+    const {authCode} = req.body;
+    if (!authCode) {
+      next(new Error('Auth code is missing'))
+      return;
+    }
+    const token = await usersController.getAccessToken(authCode);
+    //const user = await usersController.getProfile(token);
+    //L.i(`route /auth-by-code - return user - ${JSON.stringify(user)}`)
+    await res.send(token);
   } catch (e) {
     L.e(`route /auth-by-code - ${e}`)
     if (e instanceof UnauthorizedError) {
@@ -92,28 +121,82 @@ app.get("/tasks", async (req, res, next) => {
 
 });
 
+/**
+ *
+ */
 app.get("/organizations", async (req, res, next) => {
+  L.i(`route /organizations`)
 
+  try {
+    // as any because of this
+    // https://www.reddit.com/r/expressjs/comments/gz37m4/reqquery_and_typescript_parsedqs/
+    const {token} = req.query as any
+    const organizations = await usersController.getOrganizations(token);
+    res.status(200).send(organizations)
+  } catch (e) {
+    L.e(`route /organizations - ${e}`)
+    if (e instanceof UnauthorizedError) {
+      res.status(401)
+    } else {
+      next(e)
+    }
+  }
 
 });
 
 app.get("/projects", async (req, res, next) => {
+  L.i(`route /projects`)
 
+  try {
+    // as any because of this
+    // https://www.reddit.com/r/expressjs/comments/gz37m4/reqquery_and_typescript_parsedqs/
+    const {organizationName, token} = req.query as any;
+    const projects = await usersController.getProjects(organizationName, token);
+    //res.status(200).json({organizations: organizations.map(o => JSON.stringify(o))})
+    res.status(200).send(projects)
+  } catch (e) {
+    L.e(`route /projects - ${e}`)
+    if (e instanceof UnauthorizedError) {
+      res.status(401)
+    } else {
+      next(e)
+    }
+  }
 
 });
 
 app.get("/tasks-suggestions", async (req, res, next) => {
-
-  function sleep(delay = 0) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, delay);
-    });
+  try {
+    const {organizationName, projectName, query, token} = req.query as any;
+    L.i(`/tasks-suggestions - ${organizationName}, ${projectName}, ${query}`)
+    const tasks = await tasksController.getSuggestions(organizationName, projectName, query, token)
+    console.log(`/tasks-suggestions - ${tasks.map(t => t.name)}`)
+    res.status(200).send(tasks)
+  } catch (e) {
+    L.e(`route /tasks-suggestions - ${e}`)
+    if (e instanceof UnauthorizedError) {
+      res.status(401)
+    } else {
+      next(e)
+    }
   }
+});
 
-  await sleep(2000)
+app.post('/plan-tasks', async (req, res, next) => {
 
-  res
-    .status(200)
-    .send(['adfadf', 'super task', 'suck task', 'adfasdf'])
+  L.i(`route /plan-tasks`)
+
+  try {
+    const {tasks} = req.body;
+    const user = await tasksController.planTasks(tasks);
+    await res.status(200).json(user)
+  } catch (e) {
+    L.e(`route /auth - ${e}`)
+    if (e instanceof UnauthorizedError) {
+      res.status(401)
+    } else {
+      next(e)
+    }
+  }
 
 });

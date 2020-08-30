@@ -13,15 +13,15 @@ export default class TasksRepository {
     this.tasksDb = new TasksDb(db)
   }
 
-  get = (id : string) => {
+  get = (id : string) : Promise<Task>=> {
     L.i(`get - ${id}`)
     return this.tasksDb.getById(id);
   }
 
-  /*add = async (task : Task) => {
-    L.i(`add - ${task.name}`)
-    return this.tasksDb.add(task);
-  }*/
+  addTasks = async (tasks : Array<Task>) : Promise<boolean> => {
+    L.i(`add - ${tasks.length}`)
+    return this.tasksDb.addTasks(tasks);
+  }
 
   getSuggestions = async (query : string) => {
     // get list of tasks from azure api

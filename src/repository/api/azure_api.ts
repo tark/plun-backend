@@ -3,7 +3,7 @@ import axios from "axios";
 import qs from "qs";
 import Logger from "../../util/logger";
 import Cache from "../cache";
-import {Organization, Project} from "../models/models";
+import {Organization, Project, Task} from "../models/models";
 
 const L = new Logger('AzureApi');
 const baseUrl = 'https://app.vssps.visualstudio.com'
@@ -85,6 +85,125 @@ export default class AzureApi {
   }
 
   /**
+   * Use this
+   * https://docs.microsoft.com/en-us/rest/api/azure/devops/search/work%20item%20search%20results/fetch%20work%20item%20search%20results?view=azure-devops-rest-6.0#workitemresult
+   */
+  getTasksNew = async (organizationName: string,
+                       projectName: string,
+                       query: string,
+                       token: string): Promise<Array<Task>> => {
+
+    if (!organizationName || !projectName || !query) {
+      return []
+    }
+
+    if (!token) {
+      throw new UnauthorizedError();
+    }
+
+    const result = await axios.post(
+      `https://almsearch.dev.azure.com/${organizationName}/${projectName}/_apis/search/workitemsearchresults?api-version=6.0-preview.1`,
+      {
+        'searchText': `${query}*`,
+        '$skip': 0,
+        '$top': 5,
+        '$orderBy': [
+          {
+            'field': 'system.title',
+            'sortOrder': 'ASC'
+          }
+        ],
+        'includeFacets': true
+      }
+      ,
+      this.config(token)
+    );
+
+    if (result.data == null || result.data.results == null || !result.data.results.length) {
+      return [];
+    }
+
+    return result.data.results.map((r: any) => {
+      return {
+        azureId: r.fields['system.id'],
+        azureName: r.fields['system.title'],
+        azureUrl: r.url,
+        azureState: r.fields['system.state'],
+      }
+    })
+
+    /*const data = {
+      "count": 1,
+      "results": [
+        {
+          "project": {
+            "name": "Mex",
+            "id": "ec0889e0-36ef-43d9-a529-428eb921f160"
+          },
+          "fields": {
+            "system.id": "79",
+            "system.workitemtype": "Task",
+            "system.title": "LoginTwoFA  console warning",
+            "system.assignedto": "Desmond <desmond@duedex.com>",
+            "system.state": "To Do",
+            "system.tags": "",
+            "system.rev": "2",
+            "system.createddate": "2020-01-07T07:25:42.760Z",
+            "system.changeddate": "2020-01-07T07:29:07.820Z"
+          },
+          "hits": [
+            {
+              "fieldReferenceName": "system.description",
+              "highlights": [
+                "This is a no-<highlighthit>op</highlighthit>, but it indicates a memory leak in your application."
+              ]
+            },
+            {
+              "fieldReferenceName": "system.description",
+              "highlights": [
+                "This is a no-<highlighthit>op</highlighthit>, but it indicates a memory leak in your application."
+              ]
+            }
+          ],
+          "url": "https://dev.azure.com/DueDEX/_apis/wit/workItems/79"
+        }
+      ],
+      "infoCode": 0,
+      "facets": {
+        "System.TeamProject": [
+          {
+            "name": "Mex",
+            "id": "Mex",
+            "resultCount": 1
+          }
+        ],
+        "System.WorkItemType": [
+          {
+            "name": "Task",
+            "id": "Task",
+            "resultCount": 1
+          }
+        ],
+        "System.State": [
+          {
+            "name": "To Do",
+            "id": "To Do",
+            "resultCount": 1
+          }
+        ],
+        "System.AssignedTo": [
+          {
+            "name": "Desmond <desmond@duedex.com>",
+            "id": "Desmond <desmond@duedex.com>",
+            "resultCount": 1
+          }
+        ]
+      }
+    }*/
+
+  }
+
+  /**
    * Returns first 20 tasks suits the given query
    */
   getTasks = async (query: string,
@@ -105,7 +224,7 @@ export default class AzureApi {
 
       L.i(`getTasks - ${JSON.stringify(result.data, null, 2)}`)
 
-      const ids = result.data.workItems.map((i : any) => i.id)
+      const ids = result.data.workItems.map((i: any) => i.id)
 
       // GET https://dev.azure.com/{organization}/{project}/_apis/wit/workitems?ids={ids}&api-version=5.1
 
@@ -122,7 +241,6 @@ export default class AzureApi {
 
       L.i(`getTasks - ${JSON.stringify(result1.data, null, 2)}`)
 
-
       // get from wiql list of tasks with ids only
       // get from tasks list by ids
 
@@ -137,15 +255,8 @@ export default class AzureApi {
    */
   getProfile = async (token: string) => {
     L.i(`getProfile`)
-    try {
-      const result = await axios.get(Endpoints.profile, {headers: this.authHeader(token)});
-      L.i(`getProfile - ${JSON.stringify(result.data, null, 2)}`)
-      return result.data;
-    } catch (e) {
-      L.e(`getProfile - error - ${e}`)
-      return null;
-    }
-
+    const result = await axios.get(Endpoints.profile, {headers: this.authHeader(token)});
+    return result.data;
   }
 
   getOrganizations = async (token: string): Promise<Array<Organization>> => {
@@ -164,13 +275,10 @@ export default class AzureApi {
     }
   }
 
-  getProjects = async (organization: string, token: string): Promise<Array<Project>> => {
-    L.i(`getProjects - ${organization}`)
-    L.i(`getProjects - ${baseUrlDevAzure}/${organization}/_apis/projects`)
-    L.i(`getProjects - -----------`)
+  getProjects = async (organizationName: string, token: string): Promise<Array<Project>> => {
     try {
       const result = await axios.get(
-        `${baseUrlDevAzure}/${organization}/_apis/projects`,
+        `${baseUrlDevAzure}/${organizationName}/_apis/projects`,
         {headers: this.authHeader(token)},
       );
       L.i(`getProjects - ${JSON.stringify(result.data, null, 2)}`)
@@ -215,6 +323,18 @@ export default class AzureApi {
     return {
       headers: {
         'Authorization': `Bearer ${this.accessToken(userId)}`,
+      },
+      params: {
+        ...params,
+        'api-version': '5.1',
+      },
+    }
+  }
+
+  config = (token: string, params?: Object) => {
+    return {
+      headers: {
+        'Authorization': `Bearer ${token}`,
       },
       params: {
         ...params,

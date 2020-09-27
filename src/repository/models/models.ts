@@ -25,7 +25,6 @@ export type Task = {
   state: TaskState;
   plannedAt: number;
   azureId?: number;
-  azureName?: string;
   azureState?: TaskState;
   azureUrl?: string;
 };

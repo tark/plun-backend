@@ -11,6 +11,7 @@ import {UnauthorizedError} from "./unauthorized_error";
 import Logger from "./util/logger";
 import {Express} from "express";
 import TasksController from "./controllers/tasks_controller";
+import {Task} from "./repository/models/models";
 
 const L = new Logger('index');
 
@@ -42,7 +43,7 @@ app.listen(3001, () => console.log("Server running on port 3001"));
 
 app.get('/profile', async (req, res, next) => {
 
-  L.i(`route /profile`)
+  L.i(`get /profile`)
 
   try {
     // as any because of this
@@ -68,7 +69,7 @@ app.get('/profile', async (req, res, next) => {
  */
 app.post('/auth', async (req, res, next) => {
 
-  L.i(`route /auth`)
+  L.i(`post /auth`)
 
   try {
     const {userId} = req.body;
@@ -91,7 +92,7 @@ app.post('/auth', async (req, res, next) => {
  */
 app.post('/token', async (req, res, next) => {
 
-  L.i(`route /token`)
+  L.i(`post /token`)
 
   try {
     const {authCode} = req.body;
@@ -125,7 +126,7 @@ app.get("/tasks", async (req, res, next) => {
  *
  */
 app.get("/organizations", async (req, res, next) => {
-  L.i(`route /organizations`)
+  L.i(`get /organizations`)
 
   try {
     // as any because of this
@@ -145,7 +146,7 @@ app.get("/organizations", async (req, res, next) => {
 });
 
 app.get("/projects", async (req, res, next) => {
-  L.i(`route /projects`)
+  L.i(`get /projects`)
 
   try {
     // as any because of this
@@ -168,9 +169,9 @@ app.get("/projects", async (req, res, next) => {
 app.get("/tasks-suggestions", async (req, res, next) => {
   try {
     const {organizationName, projectName, query, token} = req.query as any;
-    L.i(`/tasks-suggestions - ${organizationName}, ${projectName}, ${query}`)
+    L.i(`get /tasks-suggestions - ${organizationName}, ${projectName}, ${query}`)
     const tasks = await tasksController.getSuggestions(organizationName, projectName, query, token)
-    console.log(`/tasks-suggestions - ${tasks.map(t => t.name)}`)
+    L.i(`/tasks-suggestions - ${tasks.map(t => t.name)}`)
     res.status(200).send(tasks)
   } catch (e) {
     L.e(`route /tasks-suggestions - ${e}`)
@@ -182,12 +183,16 @@ app.get("/tasks-suggestions", async (req, res, next) => {
   }
 });
 
-app.post('/plan-tasks', async (req, res, next) => {
+/**
+ * Make a PLUN for the today
+ */
+app.post('/plun', async (req, res, next) => {
 
-  L.i(`route /plan-tasks`)
+  L.i(`post /plun`)
 
   try {
     const {tasks} = req.body;
+    L.i(`post /plun - ${JSON.stringify(tasks, null, 2)}`)
     const user = await tasksController.planTasks(tasks);
     await res.status(200).json(user)
   } catch (e) {
@@ -200,3 +205,76 @@ app.post('/plan-tasks', async (req, res, next) => {
   }
 
 });
+
+/**
+ * Returns a PLUN :) for the given date
+ * if the date is null - returns the nearest available previous plan
+ */
+app.get("/plun", async (req, res, next) => {
+  try {
+    const {organizationName, projectName, time, token} = req.query as any;
+    L.i(`get /plun - ${time}`)
+
+    if (!time) {
+      const tasks = await tasksController.getPreviousNearestTasks(
+        organizationName,
+        projectName,
+        token
+      )
+      res.status(200).send(tasks)
+      return;
+    }
+
+    const tasks = await tasksController.getPlannedTasks(
+      organizationName,
+      projectName,
+      +time,
+      token
+    )
+    L.i(`get /plun - returning - ${tasks.length}`)
+    L.i(`get /plun - returning - ${tasks.map(t => `name - ${t.name}, id - ${t.id}`)}`)
+    L.i(`get /plun - returning - --------`)
+    res.status(200).send(tasks)
+  } catch (e) {
+    L.e(`route /plun - ${e}`)
+    if (e instanceof UnauthorizedError) {
+      res.status(401)
+    } else {
+      next(e)
+    }
+  }
+});
+
+app.delete("/plun", async (req, res, next) => {
+  try {
+    const {taskId} = req.body;
+    //const {taskId} = req.query as any;
+    L.i(`delete /plun - body - ${JSON.stringify(req.body)}`)
+    await tasksController.deleteTask(taskId)
+    res.status(200).send()
+  } catch (e) {
+    L.e(`route /plun - ${e}`)
+    if (e instanceof UnauthorizedError) {
+      res.status(401)
+    } else {
+      next(e)
+    }
+  }
+});
+
+app.patch("/plun", async (req, res, next) => {
+  try {
+    const task: Task = req.body.task;
+    L.i(`patch /plun - taskId - ${JSON.stringify(task)}`)
+    const updatedTask = await tasksController.updateTask(task)
+    res.status(200).send(updatedTask)
+  } catch (e) {
+    L.e(`patch /plun - ${e}`)
+    if (e instanceof UnauthorizedError) {
+      res.status(401)
+    } else {
+      next(e)
+    }
+  }
+});
+

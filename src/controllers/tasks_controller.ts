@@ -37,10 +37,38 @@ export default class TasksController {
     todayMidnight.setMinutes(0);
     todayMidnight.setSeconds(0);
     todayMidnight.setMilliseconds(0);
-    return await this.tasksRepository.addTasks(tasks.map(t => ({
-      ...t,
-      plannedAt: todayMidnight.getTime()
-    })));
+
+    // todo check if the previous state is wrong
+    // like we go from done to construction
+    // we need to return an error
+    // later
+
+    // when we planning tasks, we add plannedAt time
+    // and add a state there
+    await Promise.all(tasks.map(async (t) => {
+      const sameTaskFromDb = await this.tasksRepository.get(t.id ?? '');
+      // check if the task is already here
+      if (sameTaskFromDb) {
+        // if so - add new plannedAt to it - that mean we plan the task for this day also
+        await this.tasksRepository.update({
+           ...t,
+           plannedAt: [
+             ...t.plannedAt,
+             todayMidnight.getTime()
+           ],
+         });
+      } else {
+        // else add this task - this is a new task
+        await this.tasksRepository.addTasks([{
+          ...t,
+          plannedAt: [todayMidnight.getTime()],
+          state: [{
+            date: todayMidnight.getTime(),
+            state: 'created',
+          }],
+        }])
+      }
+    }))
   }
 
   /**
@@ -49,7 +77,7 @@ export default class TasksController {
   getPlannedTasks = (organizationName: string,
                      projectName: string,
                      date: number,
-                     token: string) : Promise<Array<Task>> => {
+                     token: string): Promise<Array<Task>> => {
     L.i(`getPlannedTasks - ${new Date(date)}`)
     const dateMidnight = new Date(date)
     dateMidnight.setHours(0);
@@ -70,8 +98,8 @@ export default class TasksController {
    * After found it - return all the tasks for this day
    */
   getPreviousNearestTasks = (organizationName: string,
-                            projectName: string,
-                            token: string) => {
+                             projectName: string,
+                             token: string) => {
 
     return this.tasksRepository.getPreviousNearestTasks(
       organizationName,

@@ -22,6 +22,9 @@ export default class TasksRepository {
 
   get = (id: string): Promise<Task> => {
     L.i(`get - ${id}`)
+    if (!id) {
+      return null;
+    }
     return this.tasksDb.getById(id);
   }
 

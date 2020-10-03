@@ -24,12 +24,8 @@ export default class TasksDb {
   }
 
   getByDate = async (date: number): Promise<Array<Task>> => {
-    const querySnapshot = await this.tasks().where("plannedAt", "==", date).get();
-    const tasks = new Array<Task>()
-    querySnapshot.forEach((doc) => {
-      tasks.push(this.mapDocToTask(doc))
-    });
-    return tasks;
+    const querySnapshot = await this.tasks().where("plannedAt", "array-contains", date).get();
+    return querySnapshot.docs.map((doc) => this.mapDocToTask(doc))
   }
 
   /**
@@ -37,21 +33,39 @@ export default class TasksDb {
    */
   getPreviousNearestTasks = async (): Promise<Array<Task>> => {
     L.i(`getForNearestDate`)
-    const now = moment().valueOf();
+    const now = moment().startOf('day').valueOf();
 
-    // get the nearest task
-    const querySnapshot = await this.tasks()
-      .where("plannedAt", "<", now)
-      .orderBy("plannedAt", 'desc')
-      .limit(1)
-      .get();
+    // todo: in the future don't get ALL tasks
+    // find a way we can find previous nearest task more
+    // cheap way
+    //
+    // get all tasks
+    const query = await this.tasks().get();
 
-    if (querySnapshot.empty){
+    // exit if no tasks
+    if (query.empty) {
+      return [];
+    }
+
+    // convert tasks to tasks model
+    const tasks = query.docs.map(this.mapDocToTask)
+
+    // first take all the dates
+    let allDates = tasks.reduce((acc, e) => acc.concat(e.plannedAt), []).sort();
+    allDates.push(now);
+    allDates.sort();
+    // dedupe for the case some task has "now" date
+    allDates = [...new Set(allDates)]
+
+    // if allDates was empty before we add now, or if now is the smallest date
+    if (allDates.length == 1 || allDates.indexOf(now) == 0) {
       return [];
     }
 
     // get the date
-    const date = querySnapshot.docs[0].data()['plannedAt'];
+
+    // needed date is pre nearest before now, because it's sorted
+    const date = allDates[allDates.indexOf(now) - 1];
 
     //get all tasks by this date
     return this.getByDate(date);
@@ -72,6 +86,8 @@ export default class TasksDb {
       const tasksWithSameAzureId = await this.tasks().where("azureId", "==", t.azureId ?? '').get()
       if (tasksWithSameAzureId.empty) {
         await this.tasks().add(t)
+      } else {
+        L.i(`addTasks - task with azure id == '${t.azureId}' already exists`)
       }
     }))
     return true;
@@ -81,7 +97,7 @@ export default class TasksDb {
     return this.tasks().doc(id).delete()
   }
 
-  update = async (task: Task) : Promise<Task> => {
+  update = async (task: Task): Promise<Task> => {
     const ref = this.tasks().doc(task.id);
     await ref.update(task);
     return this.getById(task.id);

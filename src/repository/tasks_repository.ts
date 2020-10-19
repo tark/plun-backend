@@ -28,9 +28,17 @@ export default class TasksRepository {
     return this.tasksDb.getById(id);
   }
 
+  getByIds = async (ids: Array<string>,
+                    organizationName: string,
+                    projectName: string,
+                    token: string): Promise<Array<Task>> => {
+    const tasksFromDb = await this.tasksDb.getByIds(ids)
+    return this.tasksFromDbToTasksFromApi(tasksFromDb, organizationName, projectName, token);
+  }
+
   getTasksByDate = async (organizationName: string,
                           projectName: string,
-                          date: number,
+                          date: string,
                           token: string): Promise<Array<Task>> => {
     // get tasks from db
     // get those tasks from azureApi (because name, url and state can change)
@@ -41,8 +49,8 @@ export default class TasksRepository {
   }
 
   getPreviousNearestTasks = async (organizationName: string,
-                                  projectName: string,
-                                  token: string): Promise<Array<Task>> => {
+                                   projectName: string,
+                                   token: string): Promise<Array<Task>> => {
     L.i(`getNearestPlannedTasks`)
     const tasksFromDb = await this.tasksDb.getPreviousNearestTasks()
 
@@ -53,6 +61,11 @@ export default class TasksRepository {
   addTasks = async (tasks: Array<Task>): Promise<boolean> => {
     L.i(`add - ${tasks.length}`)
     return this.tasksDb.addTasks(tasks);
+  }
+
+  add = async (task: Task): Promise<Task> => {
+    L.i(`add - ${task.name}`)
+    return this.tasksDb.add(task);
   }
 
   getSuggestions = async (query: string) => {
@@ -97,8 +110,8 @@ export default class TasksRepository {
       // let's return it and add there some fields from db tasks
       return {
         ...accordingTaskFromApi,
-        plannedAt: t.plannedAt,
-        state: t.state,
+        //plannedAt: t.plannedAt,
+        //state: t.state,
         id: t.id,
       }
 

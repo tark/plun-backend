@@ -11,7 +11,8 @@ import {UnauthorizedError} from "./unauthorized_error";
 import Logger from "./util/logger";
 import {Express} from "express";
 import TasksController from "./controllers/tasks_controller";
-import {Task} from "./repository/models/models";
+import {Plan, Task} from "./repository/models/models";
+import PlansController from "./controllers/plans_controller";
 
 const L = new Logger('index');
 
@@ -31,7 +32,9 @@ const cache = new Cache(nodeCache);
 const azureApi = new AzureApi(cache);
 
 const usersController = new UsersController(db, cache, azureApi);
-const tasksController = new TasksController(db, cache, azureApi);
+const tasksRepository = new TasksRepository(db, azureApi)
+const tasksController = new TasksController(db, cache, azureApi, tasksRepository);
+const plansController = new PlansController(db, cache, azureApi, tasksRepository);
 
 dotenv.config()
 
@@ -184,16 +187,16 @@ app.get("/tasks-suggestions", async (req, res, next) => {
 });
 
 /**
- * Make a PLUN for the today
+ * Create a plan for today
  */
-app.post('/plun', async (req, res, next) => {
+app.post('/plan', async (req, res, next) => {
 
   L.i(`post /plun`)
 
   try {
-    const {tasks} = req.body;
-    L.i(`post /plun - ${JSON.stringify(tasks, null, 2)}`)
-    const user = await tasksController.planTasks(tasks);
+    const {plan} = req.body;
+    L.i(`post /plun - ${JSON.stringify(plan, null, 2)}`)
+    const user = await plansController.createPlan(plan);
     await res.status(200).json(user)
   } catch (e) {
     L.e(`route /auth - ${e}`)
@@ -210,31 +213,30 @@ app.post('/plun', async (req, res, next) => {
  * Returns a PLUN :) for the given date
  * if the date is null - returns the nearest available previous plan
  */
-app.get("/plun", async (req, res, next) => {
+app.get("/plan", async (req, res, next) => {
   try {
-    const {organizationName, projectName, time, token} = req.query as any;
-    L.i(`get /plun - ${time}`)
+    const {organizationName, projectName, date, token} = req.query as any;
+    L.i(`get /plun - date: ${date}`)
 
-    if (!time) {
-      const tasks = await tasksController.getPreviousNearestTasks(
+    if (!date) {
+      const plan = await plansController.getPreviousNearestPlan(
         organizationName,
         projectName,
         token
       )
-      res.status(200).send(tasks)
+      res.status(200).send(plan)
       return;
     }
 
-    const tasks = await tasksController.getPlannedTasks(
+    const plan = await plansController.getPlanByDate(
       organizationName,
       projectName,
-      +time,
+      date,
       token
     )
-    L.i(`get /plun - returning - ${tasks.length}`)
-    L.i(`get /plun - returning - ${tasks.map(t => `name - ${t.name}, id - ${t.id}`)}`)
+    L.i(`get /plun - returning - ${JSON.stringify(plan)}`)
     L.i(`get /plun - returning - --------`)
-    res.status(200).send(tasks)
+    res.status(200).send(plan)
   } catch (e) {
     L.e(`route /plun - ${e}`)
     if (e instanceof UnauthorizedError) {
@@ -245,12 +247,12 @@ app.get("/plun", async (req, res, next) => {
   }
 });
 
-app.delete("/plun", async (req, res, next) => {
+app.delete("/plan", async (req, res, next) => {
   try {
-    const {taskId} = req.body;
+    const {taskId, date} = req.body;
     //const {taskId} = req.query as any;
-    L.i(`delete /plun - body - ${JSON.stringify(req.body)}`)
-    await tasksController.deleteTask(taskId)
+    L.i(`delete /plan - body - ${JSON.stringify(req.body)}`)
+    await plansController.stopPlanTaskForDate(taskId, date)
     res.status(200).send()
   } catch (e) {
     L.e(`route /plun - ${e}`)
@@ -262,11 +264,14 @@ app.delete("/plun", async (req, res, next) => {
   }
 });
 
-app.patch("/plun", async (req, res, next) => {
+/**
+ * Update the task in a plan. Usually for changing the state.
+ */
+app.patch("/plan", async (req, res, next) => {
   try {
-    const task: Task = req.body.task;
-    L.i(`patch /plun - taskId - ${JSON.stringify(task)}`)
-    const updatedTask = await tasksController.updateTask(task)
+    const plan: Plan = req.body.plan;
+    L.i(`patch /plan - taskId - ${JSON.stringify(plan)}`)
+    const updatedTask = await plansController.update(plan)
     res.status(200).send(updatedTask)
   } catch (e) {
     L.e(`patch /plun - ${e}`)

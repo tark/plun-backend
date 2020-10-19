@@ -23,17 +23,24 @@ export default class TasksDb {
     return this.mapDocToTask(doc);
   }
 
-  getByDate = async (date: number): Promise<Array<Task>> => {
+  getByIds = async (ids: Array<string>): Promise<Array<Task>> => {
+    const querySnapshot = await this.tasks().where("id", 'in', ids).get();
+    return querySnapshot.docs.map(this.mapDocToTask)
+  }
+
+  getByDate = async (date: string): Promise<Array<Task>> => {
     const querySnapshot = await this.tasks().where("plannedAt", "array-contains", date).get();
-    return querySnapshot.docs.map((doc) => this.mapDocToTask(doc))
+    return querySnapshot.docs.map(this.mapDocToTask)
   }
 
   /**
    * Returns list of tasks for the nearest day before that have at least one task
+   *
+   * @deprecated
    */
   getPreviousNearestTasks = async (): Promise<Array<Task>> => {
-    L.i(`getForNearestDate`)
-    const now = moment().startOf('day').valueOf();
+    L.i(`getPreviousNearestTasks`)
+    const now = moment().format('YYYY-MM-DD');
 
     // todo: in the future don't get ALL tasks
     // find a way we can find previous nearest task more
@@ -51,11 +58,15 @@ export default class TasksDb {
     const tasks = query.docs.map(this.mapDocToTask)
 
     // first take all the dates
-    let allDates = tasks.reduce((acc, e) => acc.concat(e.plannedAt), []).sort();
+    //let allDates : Array<string> = tasks.reduce((acc, e) => acc.concat(e.plannedAt), []).sort();
+    let allDates : Array<string> = [];
     allDates.push(now);
     allDates.sort();
     // dedupe for the case some task has "now" date
     allDates = [...new Set(allDates)]
+
+
+    L.i(`getPreviousNearestTasks - allDates - ${allDates}`)
 
     // if allDates was empty before we add now, or if now is the smallest date
     if (allDates.length == 1 || allDates.indexOf(now) == 0) {
@@ -65,7 +76,7 @@ export default class TasksDb {
     // get the date
 
     // needed date is pre nearest before now, because it's sorted
-    const date = allDates[allDates.indexOf(now) - 1];
+    const date : string = allDates[allDates.indexOf(now) - 1];
 
     //get all tasks by this date
     return this.getByDate(date);
@@ -108,12 +119,10 @@ export default class TasksDb {
   }
 
   mapDocToTask = (doc: firestore.DocumentSnapshot): Task => {
-    const {azureId, azureUrl, azureState, name, state, plannedAt} = doc.data()
+    const {azureId, azureUrl, azureState, name} = doc.data()
     return {
       id: doc.id,
       name,
-      state,
-      plannedAt,
       azureId,
       azureUrl,
       azureState,

@@ -51,6 +51,10 @@ export default class PlansController {
           taskId: savedTask.id
         }
 
+        // the task only for returning from the server side.
+        // not keeping it in the plans collection
+        delete entries[index].task
+
         // update plan with updated entries
         plan = {
           ...plan,
@@ -82,15 +86,15 @@ export default class PlansController {
 
   }
 
-  getPlanByDate = async (date: string,
-                         organizationName: string,
+  getPlanByDate = async (organizationName: string,
                          projectName: string,
+                         date: string,
                          token: string): Promise<Plan> => {
 
     // first take the plan
     const plan = await this.plansRepository.getPlanByDate(date);
 
-    if (!plan){
+    if (!plan) {
       return null
     }
 
@@ -122,7 +126,7 @@ export default class PlansController {
 
   }
 
-  delete = async (plan: Plan) =>{
+  delete = async (plan: Plan) => {
     return this.plansRepository.delete(plan.id);
   }
 
@@ -141,7 +145,57 @@ export default class PlansController {
 
   }
 
-  update = (plan: Plan): Promise<Plan> => {
+  entriesTasksEqual = (e1: PlanEntry, e2: PlanEntry): boolean => {
+    // no tasks - entries are different
+    if (!e1.task || !e2.task) {
+      return false;
+    }
+
+    // one task has azure id and other not - entries are different
+    if ((e1.task.azureId && !e2.task.azureId) || (!e1.task.azureId && e2.task.azureId)) {
+      return false;
+    }
+
+    // both has no azure ids - entries maybe the same if names are the same
+    // todo in the future add here check for any other id like trelloId, asanaId
+    // tasks can be taken from within other source
+    // or it will be our local task. If new local task is created - we compare it simply by name
+    if (!e1.task.azureId && !e2.task.azureId) {
+      // if both azureId is null - it's a local task
+      return e1.task.name === e2.task.name;
+    }
+
+    // otherwise compare by azure ids
+    return e1.task.azureId === e2.task.azureId
+  }
+
+  update = async (plan: Plan): Promise<Plan> => {
+
+    await Promise.all(plan.entries.map(async (e) => {
+
+      // take only cases where we have no task id and have a task at the same time
+      // that means frontend sending us a NEW task and we need to save it on backend
+      // after that we need to update entry with id and save it to plan
+      if (e.taskId || !e.task) {
+        return
+      }
+
+      // saving the task
+      const task = await this.tasksRepository.add(e.task);
+
+      plan.entries = plan.entries.map((e1) => ({
+          ...e1,
+          // update task id for entry related to this task
+          taskId: this.entriesTasksEqual(e, e1) ? task.id : e1.taskId
+        }
+      ))
+
+    }))
+
+    plan.entries = plan.entries.map((e) => {
+      delete e.task
+      return e
+    })
 
     // todo
     // - check if the plan has new tasks - create tasks then

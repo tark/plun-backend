@@ -270,7 +270,7 @@ app.delete("/plan", async (req, res, next) => {
 app.patch("/plan", async (req, res, next) => {
   try {
     const plan: Plan = req.body.plan;
-    L.i(`patch /plan - taskId - ${JSON.stringify(plan)}`)
+    L.i(`patch /plan - plan - ${JSON.stringify(plan)}`)
     const updatedTask = await plansController.update(plan)
     res.status(200).send(updatedTask)
   } catch (e) {

@@ -53,6 +53,7 @@ export default class PlansDb {
   }
 
   add = async (plan: Plan): Promise<Plan> => {
+    delete plan.id;
     const ref = await this.plans().add(plan)
     const doc = await ref.get();
     return this.mapDocToPlan(doc);
@@ -63,9 +64,12 @@ export default class PlansDb {
   }
 
   update = async (plan: Plan): Promise<Plan> => {
-    const ref = this.plans().doc(plan.id);
+    const id = plan.id;
+    delete plan.id;
+
+    const ref = this.plans().doc(id);
     await ref.update(plan);
-    return this.getById(plan.id);
+    return this.getById(id);
   }
 
   plans = (): firestore.CollectionReference => {
@@ -73,9 +77,9 @@ export default class PlansDb {
   }
 
   mapDocToPlan = (doc: firestore.DocumentSnapshot): Plan => {
-    const {id, entries, date} = doc.data()
+    const {entries, date} = doc.data()
     return {
-      id,
+      id: doc.id,
       entries,
       date,
     };

@@ -24,8 +24,22 @@ export default class TasksDb {
   }
 
   getByIds = async (ids: Array<string>): Promise<Array<Task>> => {
-    const querySnapshot = await this.tasks().where("id", 'in', ids).get();
+    ids = ids.filter((id) => !!id)
+    const querySnapshot = await this.tasks().where(firestore.FieldPath.documentId(), 'in', ids).get();
     return querySnapshot.docs.map(this.mapDocToTask)
+  }
+
+  getByAzureId = async (azureId: number) : Promise<Task> => {
+
+    if (!azureId) {
+      return null
+    }
+
+    const querySnapshot = await this.tasks().where('azureId', '==', azureId).get();
+    if (querySnapshot.size == 0) {
+      return null
+    }
+    return this.mapDocToTask(querySnapshot.docs[0])
   }
 
   getByDate = async (date: string): Promise<Array<Task>> => {
@@ -87,6 +101,15 @@ export default class TasksDb {
   }*/
 
   add = async (task: Task): Promise<Task> => {
+
+    // dont add task is the task with the same azure id already exists
+    const existingTask = await this.getByAzureId(task.azureId)
+    if (existingTask) {
+      return existingTask;
+    }
+
+    // first check if such a task already exist
+    // azure id field should be unique
     const ref = await this.tasks().add(task)
     const doc = await ref.get();
     return this.mapDocToTask(doc);

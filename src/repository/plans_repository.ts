@@ -50,7 +50,7 @@ export default class PlansRepository {
   }
 
   update = async (plan: Plan): Promise<Plan> => {
-    L.i(`update - ${plan.date}`)
+    L.i(`update - ${JSON.stringify(plan)}`)
     return this.plansDb.update(plan);
   }
 

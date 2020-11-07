@@ -39,7 +39,7 @@ export default class PlansDb {
     // get nearest previous plan
     const query = await this.plans()
       .where('date', '<', now)
-      .orderBy('date')
+      .orderBy('date', 'desc')
       .limit(1)
       .get();
 
@@ -53,10 +53,10 @@ export default class PlansDb {
   }
 
   add = async (plan: Plan): Promise<Plan> => {
-    delete plan.id;
+    plan = this.prepareForInternalSave(plan)
     const ref = await this.plans().add(plan)
     const doc = await ref.get();
-    return this.mapDocToPlan(doc);
+    return this.getById(doc.id)
   }
 
   delete = (id: string) => {
@@ -64,9 +64,12 @@ export default class PlansDb {
   }
 
   update = async (plan: Plan): Promise<Plan> => {
-    const id = plan.id;
-    delete plan.id;
+    const id = plan.id
+    if (!id){
+      throw Error('Can not update plan without an `id` field')
+    }
 
+    plan = this.prepareForInternalSave(plan)
     const ref = this.plans().doc(id);
     await ref.update(plan);
     return this.getById(id);
@@ -83,6 +86,15 @@ export default class PlansDb {
       entries,
       date,
     };
+  }
+
+  private prepareForInternalSave = (plan: Plan): Plan => {
+    delete plan.id
+    plan.entries = plan.entries.map((e) => {
+      delete e.task
+      return e
+    })
+    return plan
   }
 
 }

@@ -28,6 +28,14 @@ export default class TasksRepository {
     return this.tasksDb.getById(id);
   }
 
+  getByAzureId = (azureIdd: number): Promise<Task> => {
+    L.i(`getByAzureId - ${azureIdd}`)
+    if (!azureIdd) {
+      return null;
+    }
+    return this.tasksDb.getByAzureId(azureIdd);
+  }
+
   getByIds = async (ids: Array<string>,
                     organizationName: string,
                     projectName: string,
@@ -58,18 +66,10 @@ export default class TasksRepository {
 
   }
 
-  addTasks = async (tasks: Array<Task>): Promise<boolean> => {
-    L.i(`add - ${tasks.length}`)
-    return this.tasksDb.addTasks(tasks);
-  }
-
   add = async (task: Task): Promise<Task> => {
     L.i(`add - ${task.name}`)
-    return this.tasksDb.add(task);
-  }
 
-  getSuggestions = async (query: string) => {
-    // get list of tasks from azure api
+    return this.tasksDb.add(task);
   }
 
   delete = async (id: string) => {

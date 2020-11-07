@@ -1,3 +1,9 @@
+export type AzureProfile = {
+  id: string;
+  displayName: string;
+  emailAddress: string;
+};
+
 export type User = {
   id: string;
   azureProfileId: string;
@@ -38,6 +44,13 @@ export type PlanEntry = {
   taskState: TaskState,
   // external field, used to return in API
   task?: Task,
+}
+
+export type AzureAuthResponse = {
+  accessToken: string,
+  tokenType: string,
+  expiresIn: number,
+  refreshToken: string,
 }
 
 export type TaskState = 'created' | 'done' | 'progress' | 'failed' | 'cancelled'

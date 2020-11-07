@@ -101,30 +101,20 @@ export default class TasksDb {
   }*/
 
   add = async (task: Task): Promise<Task> => {
+    L.i(`add - ${task.azureId}`)
 
+    // first check if such a task already exist
+    // azure id field should be unique
     // dont add task is the task with the same azure id already exists
     const existingTask = await this.getByAzureId(task.azureId)
     if (existingTask) {
       return existingTask;
     }
 
-    // first check if such a task already exist
-    // azure id field should be unique
+    delete task.id
     const ref = await this.tasks().add(task)
     const doc = await ref.get();
     return this.mapDocToTask(doc);
-  }
-
-  addTasks = async (tasks: Array<Task>): Promise<boolean> => {
-    await Promise.all(tasks.map(async t => {
-      const tasksWithSameAzureId = await this.tasks().where("azureId", "==", t.azureId ?? '').get()
-      if (tasksWithSameAzureId.empty) {
-        await this.tasks().add(t)
-      } else {
-        L.i(`addTasks - task with azure id == '${t.azureId}' already exists`)
-      }
-    }))
-    return true;
   }
 
   delete = (id: string) => {

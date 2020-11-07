@@ -46,9 +46,26 @@ export default class UsersDb {
   }
 
   add = async (user: User) : Promise<User> => {
-    L.i(`add - ${user.email}`)
+    L.i(`add - ${JSON.stringify(user.email)}`)
     const docRef = await this.users().add(user)
     const snapshot = await docRef.get()
+    const {azureProfileId, name, email} = snapshot.data()
+    return {
+      id: snapshot.id,
+      azureProfileId,
+      name,
+      email,
+    };
+  }
+
+  update = async (user: User) : Promise<User> => {
+    L.i(`update - ${JSON.stringify(user)}`)
+    const doc = this.users().doc(user.id);
+    await doc.update({
+      email: user.email,
+      name: user.name,
+    })
+    const snapshot = await doc.get()
     const {azureProfileId, name, email} = snapshot.data()
     return {
       id: snapshot.id,

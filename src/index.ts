@@ -1,4 +1,4 @@
-import express from "express";
+import express, {NextFunction} from "express";
 import UsersController from "./controllers/users_controller";
 import cors from 'cors'
 import * as dotenv from 'dotenv'
@@ -42,28 +42,26 @@ const app: Express = express();
 app.use(cors());
 app.use(express.urlencoded({extended: true}));
 app.use(express.json());
-app.listen(3001, () => console.log("Server running on port 3001"));
-
-app.get('/profile', async (req, res, next) => {
-
-  L.i(`get /profile`)
-
+app.use((req, res, next) => {
+  const auth = req.headers.authorization?.split(' ')
+  const token = auth[0] === 'Bearer' ? auth[1] : null
+  // token required for all paths except auth and refresh token
+  if (req.path !== '/auth' && req.path !== '/refreshToken' && !token) {
+    return res.sendStatus(401)
+  }
   try {
-    // as any because of this
-    // https://www.reddit.com/r/expressjs/comments/gz37m4/reqquery_and_typescript_parsedqs/
-    const {token} = req.query as any;
-    const profile = await usersController.getProfile(token);
-    res.status(200).send(profile)
+    req.body.token = token
+    next();
   } catch (e) {
-    L.e(`route /projects - ${e}`)
     if (e instanceof UnauthorizedError) {
-      res.status(401)
+      res.sendStatus(401)
     } else {
       next(e)
     }
   }
+});
 
-})
+app.listen(3001, () => console.log('Server running on port 3001'));
 
 /**
  * First of all user try to auth just by id
@@ -71,13 +69,12 @@ app.get('/profile', async (req, res, next) => {
  * If token is not valid anymore, server returns 401 not authorized
  */
 app.post('/auth', async (req, res, next) => {
-
   L.i(`post /auth`)
-
   try {
-    const {userId} = req.body;
-    const user = await usersController.auth(userId);
-    await res.status(200).json(user)
+    L.i(`post /auth`)
+    const {authCode} = req.body;
+    const authResponse = await usersController.authByCode(authCode);
+    await res.status(200).json(authResponse)
   } catch (e) {
     L.e(`route /auth - ${e}`)
     if (e instanceof UnauthorizedError) {
@@ -89,38 +86,38 @@ app.post('/auth', async (req, res, next) => {
 
 });
 
-/**
- * Frontend should call this if it has no userId,
- * or if the previous try to auth by token returned 401 unauthorized error.
- */
-app.post('/token', async (req, res, next) => {
-
-  L.i(`post /token`)
-
+app.post('/refreshToken', async (req, res, next) => {
   try {
-    const {authCode} = req.body;
-    if (!authCode) {
-      next(new Error('Auth code is missing'))
-      return;
+    const refreshToken: string = req.body.refreshToken;
+
+    if (!refreshToken) {
+      next(new Error('RefreshToken parameter is missing'))
     }
-    const token = await usersController.getAccessToken(authCode);
-    //const user = await usersController.getProfile(token);
-    //L.i(`route /auth-by-code - return user - ${JSON.stringify(user)}`)
-    await res.send(token);
+
+    const azureAuthResponse = await usersController.refreshToken(refreshToken)
+    res.status(200).json(azureAuthResponse)
   } catch (e) {
-    L.e(`route /auth-by-code - ${e}`)
+    L.e(`post /refreshToken - ${e}`)
     if (e instanceof UnauthorizedError) {
       res.status(401)
     } else {
       next(e)
     }
   }
-
 });
+
+// --- PRIVATE ROUTES ---
+
+app.get('/profile', async (req, res, next) => {
+  L.i(`get /profile`)
+  const {token} = req.body;
+  const profile = await usersController.getProfile(token);
+  res.status(200).send(profile)
+})
 
 app.get("/tasks", async (req, res, next) => {
 
-  L.i(`route test`)
+  L.i(`get /tasks`)
   res.status(200).send()
 
 });
@@ -156,7 +153,6 @@ app.get("/projects", async (req, res, next) => {
     // https://www.reddit.com/r/expressjs/comments/gz37m4/reqquery_and_typescript_parsedqs/
     const {organizationName, token} = req.query as any;
     const projects = await usersController.getProjects(organizationName, token);
-    //res.status(200).json({organizations: organizations.map(o => JSON.stringify(o))})
     res.status(200).send(projects)
   } catch (e) {
     L.e(`route /projects - ${e}`)
@@ -174,7 +170,6 @@ app.get("/tasks-suggestions", async (req, res, next) => {
     const {organizationName, projectName, query, token} = req.query as any;
     L.i(`get /tasks-suggestions - ${organizationName}, ${projectName}, ${query}`)
     const tasks = await tasksController.getSuggestions(organizationName, projectName, query, token)
-    L.i(`/tasks-suggestions - ${tasks.map(t => t.name)}`)
     res.status(200).send(tasks)
   } catch (e) {
     L.e(`route /tasks-suggestions - ${e}`)
@@ -194,10 +189,17 @@ app.post('/plan', async (req, res, next) => {
   L.i(`post /plun`)
 
   try {
-    const {plan} = req.body;
+    const {plan, organizationName, projectName, token} = req.body;
+
+    checkParameter(plan, 'plan')
+    checkParameter(organizationName, 'organizationName')
+    checkParameter(projectName, 'projectName')
+    checkParameter(token, 'token')
+
     L.i(`post /plun - ${JSON.stringify(plan, null, 2)}`)
-    const user = await plansController.createPlan(plan);
-    await res.status(200).json(user)
+    const planCreated = await plansController.createPlan(plan, organizationName, projectName, token);
+    L.i(`post /plan - ${JSON.stringify(planCreated, null, 2)}`)
+    await res.status(200).json(planCreated)
   } catch (e) {
     L.e(`route /auth - ${e}`)
     if (e instanceof UnauthorizedError) {
@@ -271,8 +273,9 @@ app.patch("/plan", async (req, res, next) => {
   try {
     const plan: Plan = req.body.plan;
     L.i(`patch /plan - plan - ${JSON.stringify(plan)}`)
-    const updatedTask = await plansController.update(plan)
-    res.status(200).send(updatedTask)
+    const updatedPlan = await plansController.update(plan)
+    L.i(`patch plan - returning - ${JSON.stringify(updatedPlan)}`)
+    res.status(200).json(updatedPlan)
   } catch (e) {
     L.e(`patch /plun - ${e}`)
     if (e instanceof UnauthorizedError) {
@@ -283,3 +286,8 @@ app.patch("/plan", async (req, res, next) => {
   }
 });
 
+const checkParameter = (parameterValue: any, parameterName: string) => {
+  if (!parameterValue) {
+    throw new Error(`"${parameterName}" parameter is missing`)
+  }
+}

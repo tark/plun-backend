@@ -40,10 +40,6 @@ export default class PlansRepository {
     return this.plansDb.add(plan);
   }
 
-  getSuggestions = async (query: string) => {
-    // get list of Plans from azure api
-  }
-
   delete = async (id: string) => {
     L.i(`delete - ${id}`)
     return this.plansDb.delete(id);

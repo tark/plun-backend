@@ -31,7 +31,10 @@ export default class PlansController {
   }
 
 
-  createPlan = async (plan: Plan): Promise<Plan> => {
+  createPlan = async (plan: Plan,
+                      organizationName: string,
+                      projectName: string,
+                      token: string): Promise<Plan> => {
     L.i(`createPlan`)
 
     // check all tasks
@@ -40,30 +43,39 @@ export default class PlansController {
     // then save plan with the given id
 
     await Promise.all(plan.entries.map(async (entry, index) => {
-      // check if the given tasks exist
-      const task = await this.tasksRepository.get(entry.taskId)
-      if (!task && entry.task) {
-        const savedTask = await this.tasksRepository.add(entry.task);
-        const entries = plan.entries
-        // update entries with just saved task id
-        entries[index] = {
-          ...entry,
-          taskId: savedTask.id
-        }
 
-        // the task only for returning from the server side.
-        // not keeping it in the plans collection
-        delete entries[index].task
-
-        // update plan with updated entries
-        plan = {
-          ...plan,
-          entries
-        }
+      // entry have no task, nothing to save
+      if (!entry.task) {
+        return
       }
+
+      // check if the given tasks exist.
+      const task = await this.tasksRepository.get(entry.taskId) ||
+        await this.tasksRepository.getByAzureId(entry.task.azureId)
+
+      L.i(`task found! - ${JSON.stringify(task)}`)
+
+      let taskId: string
+      if (task) {
+        // task is exist - no need to create, and we will NOT update it
+        // for update use `updatePlan` method
+        // we just take the task id from here
+        taskId = task.id
+      } else {
+        // otherwise let's create it
+        const savedTask = await this.tasksRepository.add(entry.task);
+        taskId = savedTask.id;
+      }
+
+      plan = this.updateEntryWithTaskId(plan, index, taskId)
+
     }))
 
-    return await this.plansRepository.add(plan)
+    L.i(`createPlan - ${JSON.stringify(plan, null, 2)}`)
+
+    const createdPlan = await this.plansRepository.add(plan)
+
+    return this.fillPlanWithTasks(createdPlan, organizationName, projectName, token);
 
   }
 
@@ -138,10 +150,18 @@ export default class PlansController {
       return
     }
 
-    await this.plansRepository.update({
-      ...plan,
-      entries: plan.entries.filter((e) => e.taskId === taskId)
-    })
+    const newEntries = plan.entries.filter((e) => e.taskId === taskId)
+
+    L.i(`stopPlanTaskForDate - ${JSON.stringify(newEntries)}`)
+
+    if (!newEntries || !newEntries.length) {
+      await this.plansRepository.delete(plan.id)
+    } else {
+      await this.plansRepository.update({
+        ...plan,
+        entries: newEntries
+      })
+    }
 
   }
 
@@ -197,12 +217,23 @@ export default class PlansController {
       return e
     })
 
-    // todo
-    // - check if the plan has new tasks - create tasks then
-    // - check if all tasks id are valid
-    // - check if all tasks states are valid
+    if (!plan.entries.length) {
+      await this.plansRepository.delete(plan.id);
+      return null;
+    }
 
     return this.plansRepository.update(plan);
+  }
+
+  private updateEntryWithTaskId = (plan: Plan, entryIndex: number, taskId: string): Plan => {
+    return {
+      ...plan,
+      entries: plan.entries.map((e, i) => ({
+        ...e,
+        taskId: i === entryIndex ? taskId : e.taskId,
+      }))
+    }
+
   }
 
 }

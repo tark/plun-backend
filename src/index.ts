@@ -127,12 +127,8 @@ app.get("/tasks", async (req, res, next) => {
  */
 app.get("/organizations", async (req, res, next) => {
   L.i(`get /organizations`)
-
   try {
-    // as any because of this
-    // https://www.reddit.com/r/expressjs/comments/gz37m4/reqquery_and_typescript_parsedqs/
-    const {token} = req.query as any
-    const organizations = await usersController.getOrganizations(token);
+    const organizations = await usersController.getOrganizations(req.body.token);
     res.status(200).send(organizations)
   } catch (e) {
     L.e(`route /organizations - ${e}`)
@@ -151,7 +147,8 @@ app.get("/projects", async (req, res, next) => {
   try {
     // as any because of this
     // https://www.reddit.com/r/expressjs/comments/gz37m4/reqquery_and_typescript_parsedqs/
-    const {organizationName, token} = req.query as any;
+    const {token} = req.body;
+    const {organizationName} = req.query as any;
     const projects = await usersController.getProjects(organizationName, token);
     res.status(200).send(projects)
   } catch (e) {
@@ -167,7 +164,8 @@ app.get("/projects", async (req, res, next) => {
 
 app.get("/tasks-suggestions", async (req, res, next) => {
   try {
-    const {organizationName, projectName, query, token} = req.query as any;
+    const {organizationName, projectName, query} = req.query as any;
+    const {token} = req.body;
     L.i(`get /tasks-suggestions - ${organizationName}, ${projectName}, ${query}`)
     const tasks = await tasksController.getSuggestions(organizationName, projectName, query, token)
     res.status(200).send(tasks)
@@ -217,19 +215,9 @@ app.post('/plan', async (req, res, next) => {
  */
 app.get("/plan", async (req, res, next) => {
   try {
-    const {organizationName, projectName, date, token} = req.query as any;
+    const {organizationName, projectName, date} = req.query as any;
+    const {token} = req.body;
     L.i(`get /plun - date: ${date}`)
-
-    if (!date) {
-      const plan = await plansController.getPreviousNearestPlan(
-        organizationName,
-        projectName,
-        token
-      )
-      res.status(200).send(plan)
-      return;
-    }
-
     const plan = await plansController.getPlanByDate(
       organizationName,
       projectName,

@@ -113,8 +113,6 @@ export default class PlansController {
       dateTo,
     );
 
-    L.i(`getPlans - ${plans.map(p => p.date)}`)
-
     // todo refactor it this way
     // UserPlans get the plans
     // every plan returned with the task that contains only the azure url and azureid

@@ -75,43 +75,4 @@ export default class TasksController {
     }))
   }*/
 
-  /**
-   * Returns planned tasks by given date
-   */
-  getPlannedTasks = (organizationName: string,
-                     projectName: string,
-                     date: string,
-                     token: string): Promise<Array<Task>> => {
-    L.i(`getPlannedTasks - date - ${date}`)
-    return this.tasksRepository.getTasksByDate(
-      organizationName,
-      projectName,
-      date,
-      token
-    );
-  }
-
-  /**
-   * Returns nearest available planned tasks
-   * Looks for what nearest day has tasks
-   * After found it - return all the tasks for this day
-   */
-  getPreviousNearestTasks = (organizationName: string,
-                             projectName: string,
-                             token: string) => {
-
-    return this.tasksRepository.getPreviousNearestTasks(
-      organizationName,
-      projectName,
-      token
-    );
-
-
-  }
-
-
-  updateTask = (task: Task): Promise<Task> => {
-    return this.tasksRepository.update(task);
-  }
-
 }

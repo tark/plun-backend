@@ -238,7 +238,9 @@ export default class AzureApi {
         name: v.fields['System.Title'],
         azureId: Number(v.id),
         azureState: v.fields['System.State'],
-        azureUrl: v.url.replace('_apis/wit/workItems', '_workitems/edit')
+        azureUrl: v.url.replace('_apis/wit/workItems', '_workitems/edit'),
+        azureOrganizationName: organizationName,
+        azureProjectName: projectName,
       }
     });
 

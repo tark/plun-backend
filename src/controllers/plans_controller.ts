@@ -3,10 +3,9 @@ import AzureApi from "../repository/api/azure_api";
 import Cache from "../repository/cache";
 import {firestore} from "firebase";
 import Logger from "../util/logger";
-import {Plan, PlanEntry, Task} from "../repository/models/models";
-import moment from "moment";
+import {Plan, PlanEntry} from "../repository/models/models";
 import PlansRepository from "../repository/plans_repository";
-import {replaceWhere} from "../util/list_util";
+import {UnauthorizedError} from "../unauthorized_error";
 
 const L = new Logger('PlansController');
 
@@ -31,10 +30,7 @@ export default class PlansController {
   }
 
 
-  createPlan = async (plan: Plan,
-                      organizationName: string,
-                      projectName: string,
-                      token: string): Promise<Plan> => {
+  createPlan = async (plan: Plan, token: string): Promise<Plan> => {
     L.i(`createPlan`)
 
     // check all tasks
@@ -63,7 +59,11 @@ export default class PlansController {
         taskId = task.id
       } else {
         // otherwise let's create it
-        const savedTask = await this.tasksRepository.add(entry.task);
+        const savedTask = await this.tasksRepository.add({
+          ...entry.task,
+          azureOrganizationName: plan.azureOrganizationName,
+          azureProjectName: plan.azureProjectName,
+        });
         taskId = savedTask.id;
       }
 
@@ -75,56 +75,87 @@ export default class PlansController {
 
     const createdPlan = await this.plansRepository.add(plan)
 
-    return this.fillPlanWithTasks(createdPlan, organizationName, projectName, token);
+    return this.fillPlanWithTasks(createdPlan, /*organizationName, projectName,*/ token);
 
   }
 
-  /**
-   * Returns nearest available plan
-   */
-  getPreviousNearestPlan = async (organizationName: string,
-                                  projectName: string,
-                                  token: string): Promise<Plan> => {
+  getPlan = async (organizationName: string,
+                   projectName: string,
+                   date: string,
+                   token: string): Promise<Plan> => {
 
     // first take the plan
-    const plan = await this.plansRepository.getPreviousPlan();
+    const plan = await this.plansRepository.getPlanByParams(date, organizationName, projectName);
 
     if (!plan) {
       return null
     }
 
     // fill it with tasks and return
-    return this.fillPlanWithTasks(plan, organizationName, projectName, token)
+    return this.fillPlanWithTasks(plan, token)
 
   }
 
-  getPlanByDate = async (organizationName: string,
-                         projectName: string,
-                         date: string,
-                         token: string): Promise<Plan> => {
+  getPlans = async (organizationName: string,
+                    projectName: string,
+                    dateFrom: string,
+                    dateTo: string,
+                    //userId: string,
+                    token: string): Promise<Array<Plan>> => {
+
+    L.i(`getPlans - ${dateFrom}, ${dateTo}`)
 
     // first take the plan
-    const plan = await this.plansRepository.getPlanByDate(date);
+    const plans = await this.plansRepository.getPlansForDates(
+      organizationName,
+      projectName,
+      dateFrom,
+      dateTo,
+    );
 
-    if (!plan) {
-      return null
-    }
+    L.i(`getPlans - ${plans.map(p => p.date)}`)
 
-    // fill it with tasks and return
-    return this.fillPlanWithTasks(plan, organizationName, projectName, token)
+    // todo refactor it this way
+    // UserPlans get the plans
+    // every plan returned with the task that contains only the azure url and azureid
+    // then frontend get task information from the azure devops server itself
+    // so we DON'T fill tasks with it's info
+    //
+    // So every element in the frontend will ge the task data itself
+    // that way we
+    // 1) save the bandwidth for our server
+    // 2) loading will be much more faster for the frontend
+
+    // this is very SLOW
+    return await Promise.all(plans.map(async (p) => this.fillPlanWithTasks(p, token)))
 
   }
 
-  fillPlanWithTasks = async (plan: Plan,
-                             organizationName: string,
-                             projectName: string,
-                             token: string): Promise<Plan> => {
+  getPlansWithoutTasks = async (organizationName: string,
+                                projectName: string,
+                                token: string): Promise<Array<Plan>> => {
+
+    // Yes, we check only existence of token,
+    // we don't check if the token is right.
+    // token usually need to fill the plan with the tasks
+    // here we don't fill the plan. But we kind of don't want
+    // to return plan as is (without token) and at the same time
+    // we can't check the token (azure devops rest api checking it)
+    //
+    // so we just check if we have token. that's all.
+    if (!token) {
+      throw new UnauthorizedError();
+    }
+
+    return await this.plansRepository.getPlansByOrganizationAndProject(organizationName, projectName);
+
+  }
+
+  fillPlanWithTasks = async (plan: Plan, token: string): Promise<Plan> => {
 
     // then fill it with the tasks
     const tasks = await this.tasksRepository.getByIds(
       plan.entries.map((entry) => entry.taskId),
-      organizationName,
-      projectName,
       token,
     )
 
@@ -140,29 +171,6 @@ export default class PlansController {
 
   delete = async (plan: Plan) => {
     return this.plansRepository.delete(plan.id);
-  }
-
-  stopPlanTaskForDate = async (taskId: string, date: string) => {
-
-    const plan = await this.plansRepository.getPlanByDate(date)
-
-    if (!plan) {
-      return
-    }
-
-    const newEntries = plan.entries.filter((e) => e.taskId === taskId)
-
-    L.i(`stopPlanTaskForDate - ${JSON.stringify(newEntries)}`)
-
-    if (!newEntries || !newEntries.length) {
-      await this.plansRepository.delete(plan.id)
-    } else {
-      await this.plansRepository.update({
-        ...plan,
-        entries: newEntries
-      })
-    }
-
   }
 
   entriesTasksEqual = (e1: PlanEntry, e2: PlanEntry): boolean => {
@@ -189,7 +197,7 @@ export default class PlansController {
     return e1.task.azureId === e2.task.azureId
   }
 
-  update = async (plan: Plan): Promise<Plan> => {
+  update = async (plan: Plan, token: string): Promise<Plan> => {
 
     await Promise.all(plan.entries.map(async (e) => {
 
@@ -201,7 +209,11 @@ export default class PlansController {
       }
 
       // saving the task
-      const task = await this.tasksRepository.add(e.task);
+      const task = await this.tasksRepository.add({
+        ...e.task,
+        azureOrganizationName: plan.azureOrganizationName,
+        azureProjectName: plan.azureProjectName,
+      });
 
       plan.entries = plan.entries.map((e1) => ({
           ...e1,
@@ -222,7 +234,10 @@ export default class PlansController {
       return null;
     }
 
-    return this.plansRepository.update(plan);
+    const updatedPlan = await this.plansRepository.update(plan);
+
+    // fill it with tasks and return
+    return this.fillPlanWithTasks(updatedPlan, /*organizationName, projectName,*/ token)
   }
 
   private updateEntryWithTaskId = (plan: Plan, entryIndex: number, taskId: string): Plan => {

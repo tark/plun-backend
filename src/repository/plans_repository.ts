@@ -19,10 +19,6 @@ export default class PlansRepository {
     this.azureApi = azureApi
   }
 
-  getPreviousPlan = (): Promise<Plan> => {
-    return this.plansDb.getPreviousPlan();
-  }
-
   get = (id: string): Promise<Plan> => {
     L.i(`get - ${id}`)
     if (!id) {
@@ -31,8 +27,40 @@ export default class PlansRepository {
     return this.plansDb.getById(id);
   }
 
-  getPlanByDate = async (date: string): Promise<Plan> => {
-    return await this.plansDb.getByDate(date)
+  getPlanByParams = async (date: string, organizationName: string, projectName: string): Promise<Plan> => {
+    return await this.plansDb.getByParams(date, organizationName, projectName)
+  }
+
+  getPlansByOrganizationAndProject = async (organizationName: string, projectName: string): Promise<Array<Plan>> => {
+    return await this.plansDb.getByOrganizationAndProject(organizationName, projectName)
+  }
+
+  getUserPlansForDates = async (organizationName: string,
+                                projectName: string,
+                                dateFrom: string,
+                                dateTo: string,
+                                userId: string) => {
+    L.i(`getUserPlansForDates - ${dateFrom}, ${dateTo}`)
+    return this.plansDb.getUserPlansForDates(
+      organizationName,
+      projectName,
+      dateFrom,
+      dateTo,
+      userId
+    )
+  }
+
+  getPlansForDates = async (organizationName: string,
+                            projectName: string,
+                            dateFrom: string,
+                            dateTo: string) => {
+    L.i(`getUserPlansForDates - ${dateFrom}, ${dateTo}`)
+    return this.plansDb.getPlansForDates(
+      organizationName,
+      projectName,
+      dateFrom,
+      dateTo
+    )
   }
 
   add = async (plan: Plan): Promise<Plan> => {

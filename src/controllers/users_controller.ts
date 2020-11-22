@@ -7,6 +7,7 @@ import AzureApi from "../repository/api/azure_api";
 import Cache from "../repository/cache";
 import {AzureAuthResponse, Organization, Project, User} from "../repository/models/models";
 import {firestore} from "firebase";
+import PlansController from "./plans_controller";
 
 const L = new Logger('UsersController');
 
@@ -16,15 +17,20 @@ export default class UsersController {
   usersRepository: UsersRepository;
   organizationsRepository: OrganizationsRepository;
   projectsRepository: ProjectsRepository;
+  plansController: PlansController;
   azureApi: AzureApi;
 
-  constructor(db: firestore.Firestore, cache: Cache, azureApi: AzureApi) {
+  constructor(db: firestore.Firestore,
+              cache: Cache,
+              azureApi: AzureApi,
+              plansController: PlansController) {
 
     this.cache = cache;
     this.usersRepository = new UsersRepository(db);
     this.organizationsRepository = new OrganizationsRepository(db);
     this.projectsRepository = new ProjectsRepository(db);
     this.azureApi = azureApi;
+    this.plansController = plansController;
   }
 
   refreshToken = async (refreshToken: string): Promise<AzureAuthResponse> => {
@@ -42,7 +48,7 @@ export default class UsersController {
    *
    * @return Promise<AzureAuthResponse>
    */
-  authByCode = async (authCode: string) : Promise<AzureAuthResponse> => {
+  authByCode = async (authCode: string): Promise<AzureAuthResponse> => {
     L.i(`authByCode - ${authCode}`)
 
     const authResponse = await this.azureApi.auth(authCode);
@@ -129,6 +135,23 @@ export default class UsersController {
     L.i(`getProjects - ${organizationName}`)
     this.checkToken(token)
     return this.azureApi.getProjects(organizationName, token);
+  }
+
+  /**
+   * Return all users who have plans inside that Org/Proj
+   */
+  getUsers = async (organizationName: string,
+                    projectName: string,
+                    token: string): Promise<Array<User>> => {
+    L.i(`getUsers - ${organizationName}, ${projectName}`)
+    // get the plans
+    const plans = await this.plansController.getPlansWithoutTasks(organizationName, projectName, token)
+
+    // calculate user ids without dupes
+    const userIds = [...new Set(plans.map(p => p.userId))];
+
+    // get user for every user ids
+    return Promise.all(userIds.map(async (id) => this.usersRepository.get(id)))
   }
 
   checkToken = (token: string) => {

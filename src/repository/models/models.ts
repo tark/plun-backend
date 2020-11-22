@@ -31,12 +31,20 @@ export type Task = {
   azureId?: number;
   azureState?: TaskState;
   azureUrl?: string;
+  // using name, not id, because for some reason we have to use name
+  // when requesting tasks from Azure API
+  azureOrganizationName?: string;
+  // use name this just to keep things similar
+  azureProjectName?: string;
 };
 
 export type Plan = {
   id: string,
   entries: Array<PlanEntry>,
   date: string,
+  azureOrganizationName: string,
+  azureProjectName: string,
+  userId: string,
 }
 
 export type PlanEntry = {

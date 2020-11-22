@@ -1,0 +1,47 @@
+version: 2.1
+orbs:
+  node: circleci/node@1.1.6
+jobs:
+  build:
+    executor:
+      name: node/default
+    steps:
+      - checkout
+      - node/with-cache:
+          steps:
+            - run: yarn install
+  deploy-master:
+    docker:
+      - image: circleci/node:11.1.0
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints:
+            - "e9:5e:e3:51:cb:ef:87:9a:03:54:38:30:51:01:91:6d"
+      - run:
+          name: Keyscan deploy server
+          command: ssh-keyscan -H $DEPLOY_SERVER >> ~/.ssh/known_hosts
+      - run:
+          name: Get the latest code
+          command: ssh circleci@$DEPLOY_SERVER 'cd plun-backend && git pull'
+      - run:
+          name: Install dependencies
+          command: ssh circleci@$DEPLOY_SERVER 'cd plun-backend && yarn install'
+      - run:
+          name: Deploy
+          command: ssh circleci@$DEPLOY_SERVER 'cd plun-backend && yarn build'
+
+workflows:
+  build-and-test:
+    jobs:
+      - build
+      - deploy-master:
+          filters:
+            branches:
+              only:
+                - master
+          requires:
+            - build

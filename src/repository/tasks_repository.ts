@@ -36,34 +36,19 @@ export default class TasksRepository {
     return this.tasksDb.getByAzureId(azureIdd);
   }
 
-  getByIds = async (ids: Array<string>,
-                    organizationName: string,
-                    projectName: string,
-                    token: string): Promise<Array<Task>> => {
+  getByIds = async (ids: Array<string>, token: string): Promise<Array<Task>> => {
     const tasksFromDb = await this.tasksDb.getByIds(ids)
-    return this.tasksFromDbToTasksFromApi(tasksFromDb, organizationName, projectName, token);
+    return this.tasksFromDbToTasksFromApi(tasksFromDb, token);
   }
 
-  getTasksByDate = async (organizationName: string,
-                          projectName: string,
-                          date: string,
+  getTasksByDate = async (date: string,
                           token: string): Promise<Array<Task>> => {
     // get tasks from db
     // get those tasks from azureApi (because name, url and state can change)
     // return to user
     const tasksFromDb = await this.tasksDb.getByDate(date)
 
-    return this.tasksFromDbToTasksFromApi(tasksFromDb, organizationName, projectName, token)
-  }
-
-  getPreviousNearestTasks = async (organizationName: string,
-                                   projectName: string,
-                                   token: string): Promise<Array<Task>> => {
-    L.i(`getNearestPlannedTasks`)
-    const tasksFromDb = await this.tasksDb.getPreviousNearestTasks()
-
-    return this.tasksFromDbToTasksFromApi(tasksFromDb, organizationName, projectName, token)
-
+    return this.tasksFromDbToTasksFromApi(tasksFromDb, /*organizationName, projectName,*/ token)
   }
 
   add = async (task: Task): Promise<Task> => {
@@ -86,13 +71,22 @@ export default class TasksRepository {
    * Converts tasks from DB to tasks from API
    * We need this conversion, because names can changes
    */
-  tasksFromDbToTasksFromApi = async (tasksFromDb: Array<Task>,
-                                     organizationName: string,
-                                     projectName: string,
-                                     token: string): Promise<Array<Task>> => {
+  tasksFromDbToTasksFromApi = async (tasksFromDb: Array<Task>, token: string): Promise<Array<Task>> => {
+
+    if (!tasksFromDb.length) {
+      return []
+    }
+
+    // check if all tasks are from the same org and project
+    const org = tasksFromDb[0].azureOrganizationName
+    const project = tasksFromDb[0].azureProjectName
+    if (tasksFromDb.some(t => t.azureOrganizationName != org || t.azureProjectName != project)) {
+      throw new Error('Tasks should be from the same Organization and Project');
+    }
+
     const tasksFromApi = await this.azureApi.getTasksByIds(
-      organizationName,
-      projectName,
+      org,
+      project,
       tasksFromDb.map(t => t.azureId).filter(id => !!id),
       token,
     )

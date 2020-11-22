@@ -132,13 +132,15 @@ export default class TasksDb {
   }
 
   mapDocToTask = (doc: firestore.DocumentSnapshot): Task => {
-    const {azureId, azureUrl, azureState, name} = doc.data()
+    const {azureId, azureUrl, azureState, name, azureOrganizationName, azureProjectName} = doc.data()
     return {
       id: doc.id,
       name,
       azureId,
       azureUrl,
       azureState,
+      azureOrganizationName,
+      azureProjectName,
     };
   }
 

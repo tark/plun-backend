@@ -1,6 +1,6 @@
 import Logger from "../../util/logger";
 import {firestore} from "firebase";
-import {User} from "../models/models";
+import { User} from "../models/models";
 
 const L = new Logger('UserDb');
 
@@ -47,7 +47,13 @@ export default class UsersDb {
 
   add = async (user: User) : Promise<User> => {
     L.i(`add - ${JSON.stringify(user.email)}`)
-    const docRef = await this.users().add(user)
+
+    const existingUser = this.getByAzureProfileId(user.azureProfileId)
+    if (existingUser){
+      return;
+    }
+
+    const docRef = await this.users().add(this.prepareForInternalSave(user))
     const snapshot = await docRef.get()
     const {azureProfileId, name, email} = snapshot.data()
     return {
@@ -85,6 +91,12 @@ export default class UsersDb {
 
   users = () => {
     return this.db.collection('users');
+  }
+
+
+  private prepareForInternalSave = (user: User): User => {
+    delete user.id
+    return user
   }
 
 }

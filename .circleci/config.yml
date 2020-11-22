@@ -25,11 +25,8 @@ jobs:
           name: Keyscan deploy server
           command: ssh-keyscan -H $DEPLOY_SERVER >> ~/.ssh/known_hosts
       - run:
-          name: Get the latest code 1
-          command: ssh circleci@$DEPLOY_SERVER 'cd /opt/plun-backend'
-      - run:
-          name: Get the latest code 2
-          command: ssh circleci@$DEPLOY_SERVER 'git pull'
+          name: Get the latest code
+          command: ssh circleci@$DEPLOY_SERVER 'cd /opt/plun-backend && git pull'
       - run:
           name: Install dependencies
           command: ssh circleci@$DEPLOY_SERVER 'cd /opt/plun-backend && yarn install'

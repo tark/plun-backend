@@ -25,9 +25,49 @@ export default class PlansDb {
     return this.mapDocToPlan(doc);
   }
 
-  getByDate = async (date: string): Promise<Plan> => {
-    const querySnapshot = await this.plans().where("date", '==', date).get();
+  getByParams = async (date: string, organizationName: string, projectName: string): Promise<Plan> => {
+    const querySnapshot = await this.plans()
+      .where("date", '==', date)
+      .where('azureOrganizationName', '==', organizationName)
+      .where('azureProjectName', '==', projectName)
+      .get();
     return querySnapshot.docs.map((doc) => this.mapDocToPlan(doc))[0]
+  }
+
+  getByOrganizationAndProject = async (organizationName: string, projectName: string): Promise<Array<Plan>> => {
+    const querySnapshot = await this.plans()
+      .where('azureOrganizationName', '==', organizationName)
+      .where('azureProjectName', '==', projectName)
+      .get();
+    return querySnapshot.docs.map((doc) => this.mapDocToPlan(doc))
+  }
+
+  getUserPlansForDates = async (organizationName: string,
+                                projectName: string,
+                                dateFrom: string,
+                                dateTo: string,
+                                userId: string): Promise<Array<Plan>> => {
+    const querySnapshot = await this.plans()
+      .where('azureOrganizationName', '==', organizationName)
+      .where('azureProjectName', '==', projectName)
+      .where('userId', '==', userId)
+      .where('date', '>=', dateFrom)
+      .where('date', '<=', dateTo)
+      .get();
+    return querySnapshot.docs.map((doc) => this.mapDocToPlan(doc))
+  }
+
+  getPlansForDates = async (organizationName: string,
+                            projectName: string,
+                            dateFrom: string,
+                            dateTo: string): Promise<Array<Plan>> => {
+    const querySnapshot = await this.plans()
+      .where('azureOrganizationName', '==', organizationName)
+      .where('azureProjectName', '==', projectName)
+      .where('date', '>=', dateFrom)
+      .where('date', '<=', dateTo)
+      .get();
+    return querySnapshot.docs.map((doc) => this.mapDocToPlan(doc))
   }
 
   /**
@@ -65,7 +105,7 @@ export default class PlansDb {
 
   update = async (plan: Plan): Promise<Plan> => {
     const id = plan.id
-    if (!id){
+    if (!id) {
       throw Error('Can not update plan without an `id` field')
     }
 
@@ -80,11 +120,14 @@ export default class PlansDb {
   }
 
   mapDocToPlan = (doc: firestore.DocumentSnapshot): Plan => {
-    const {entries, date} = doc.data()
+    const {entries, date, azureOrganizationName, azureProjectName, userId} = doc.data()
     return {
       id: doc.id,
       entries,
       date,
+      azureOrganizationName,
+      azureProjectName,
+      userId,
     };
   }
 

@@ -1,4 +1,4 @@
-import PlansDb from "./db/Plans_db";
+import PlansDb from "./db/plans_db";
 import Logger from "../util/logger";
 import {firestore} from "firebase";
 import {Plan} from "./models/models";

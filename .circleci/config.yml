@@ -20,7 +20,7 @@ jobs:
       - checkout
       - add_ssh_keys:
           fingerprints:
-            - "e9:5e:e3:51:cb:ef:87:9a:03:54:38:30:51:01:91:6d"
+            - "f2:60:78:96:3c:d5:74:7c:58:8a:86:1a:3b:e8:23:10"
       - run:
           name: Keyscan deploy server
           command: ssh-keyscan -H $DEPLOY_SERVER >> ~/.ssh/known_hosts

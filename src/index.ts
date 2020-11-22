@@ -11,7 +11,6 @@ import {UnauthorizedError} from "./unauthorized_error";
 import Logger from "./util/logger";
 import {Express} from "express";
 import TasksController from "./controllers/tasks_controller";
-import {Plan, Task} from "./repository/models/models";
 import PlansController from "./controllers/plans_controller";
 
 const L = new Logger('index');
@@ -31,10 +30,10 @@ const nodeCache = new NodeCache();
 const cache = new Cache(nodeCache);
 const azureApi = new AzureApi(cache);
 
-const usersController = new UsersController(db, cache, azureApi);
 const tasksRepository = new TasksRepository(db, azureApi)
 const tasksController = new TasksController(db, cache, azureApi, tasksRepository);
 const plansController = new PlansController(db, cache, azureApi, tasksRepository);
+const usersController = new UsersController(db, cache, azureApi, plansController);
 
 dotenv.config()
 
@@ -187,15 +186,13 @@ app.post('/plan', async (req, res, next) => {
   L.i(`post /plun`)
 
   try {
-    const {plan, organizationName, projectName, token} = req.body;
+    const {plan, token} = req.body;
 
     checkParameter(plan, 'plan')
-    checkParameter(organizationName, 'organizationName')
-    checkParameter(projectName, 'projectName')
     checkParameter(token, 'token')
 
     L.i(`post /plun - ${JSON.stringify(plan, null, 2)}`)
-    const planCreated = await plansController.createPlan(plan, organizationName, projectName, token);
+    const planCreated = await plansController.createPlan(plan, /*organizationName, projectName, */token);
     L.i(`post /plan - ${JSON.stringify(planCreated, null, 2)}`)
     await res.status(200).json(planCreated)
   } catch (e) {
@@ -218,7 +215,7 @@ app.get("/plan", async (req, res, next) => {
     const {organizationName, projectName, date} = req.query as any;
     const {token} = req.body;
     L.i(`get /plun - date: ${date}`)
-    const plan = await plansController.getPlanByDate(
+    const plan = await plansController.getPlan(
       organizationName,
       projectName,
       date,
@@ -237,13 +234,22 @@ app.get("/plan", async (req, res, next) => {
   }
 });
 
-app.delete("/plan", async (req, res, next) => {
+/**
+ * Returns all the plans for all users for the given dates
+ */
+app.get("/plans", async (req, res, next) => {
   try {
-    const {taskId, date} = req.body;
-    //const {taskId} = req.query as any;
-    L.i(`delete /plan - body - ${JSON.stringify(req.body)}`)
-    await plansController.stopPlanTaskForDate(taskId, date)
-    res.status(200).send()
+    const {organizationName, projectName, dateFrom, dateTo/*, userId*/} = req.query as any;
+    const {token} = req.body;
+    L.i(`get /plans - ${dateFrom}, ${dateTo}`)
+    const plan = await plansController.getPlans(
+      organizationName,
+      projectName,
+      dateFrom,
+      dateTo,
+      token
+    )
+    res.status(200).send(plan)
   } catch (e) {
     L.e(`route /plun - ${e}`)
     if (e instanceof UnauthorizedError) {
@@ -259,13 +265,31 @@ app.delete("/plan", async (req, res, next) => {
  */
 app.patch("/plan", async (req, res, next) => {
   try {
-    const plan: Plan = req.body.plan;
+    const {plan, token} = req.body;
     L.i(`patch /plan - plan - ${JSON.stringify(plan)}`)
-    const updatedPlan = await plansController.update(plan)
-    L.i(`patch plan - returning - ${JSON.stringify(updatedPlan)}`)
+    const updatedPlan = await plansController.update(plan, token)
+    L.i(`patch /plan - returning - ${JSON.stringify(updatedPlan)}`)
     res.status(200).json(updatedPlan)
   } catch (e) {
     L.e(`patch /plun - ${e}`)
+    if (e instanceof UnauthorizedError) {
+      res.status(401)
+    } else {
+      next(e)
+    }
+  }
+});
+
+app.get("/users", async (req, res, next) => {
+  try {
+    const {token} = req.body;
+    const {organizationName, projectName} = req.query as any;
+    L.i(`get /users - ${organizationName}, ${projectName}`)
+    const users = await usersController.getUsers(organizationName, projectName, token)
+    L.i(`get /users - returning - ${users}`)
+    res.status(200).json(users)
+  } catch (e) {
+    L.e(`get /users - ${e}`)
     if (e instanceof UnauthorizedError) {
       res.status(401)
     } else {

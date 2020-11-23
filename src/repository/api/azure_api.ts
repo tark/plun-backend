@@ -15,8 +15,6 @@ const Endpoints = {
   projects: `${baseUrl}/_apis/projects`,
 }
 
-const callbackUrl = 'https://dev.plun.io:3000/azure-auth-callback'
-
 export default class AzureApi {
 
   cache: Cache;
@@ -38,7 +36,7 @@ export default class AzureApi {
           'client_assertion': encodeURI(process.env.AZURE_CLIENT_SECRET),
           'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
           'assertion': encodeURI(authCode),
-          'redirect_uri': callbackUrl,
+          'redirect_uri': process.env.AZURE_CALLBACK_URL,
         }),
       );
 
@@ -74,7 +72,7 @@ export default class AzureApi {
         'client_assertion': encodeURI(process.env.AZURE_CLIENT_SECRET),
         'grant_type': 'refresh_token',
         'assertion': encodeURI(refreshToken),
-        'redirect_uri': callbackUrl,
+        'redirect_uri': process.env.AZURE_CALLBACK_URL,
       }),
       {
         headers: {

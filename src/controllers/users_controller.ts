@@ -84,6 +84,9 @@ export default class UsersController {
   }*/
 
   getProfile = async (token: string): Promise<User> => {
+    if (!token) {
+      throw new UnauthorizedError()
+    }
     const azureProfile = await this.azureApi.getProfile(token)
     return this.usersRepository.addOrUpdateByAzureId(azureProfile);
   }

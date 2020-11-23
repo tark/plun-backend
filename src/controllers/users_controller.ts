@@ -61,7 +61,7 @@ export default class UsersController {
     if (!savedUser) {
       // save user if we don't have one
       await this.usersRepository.add({
-        id: savedUser.id,
+        id: '',
         azureProfileId: id,
         name: displayName,
         email: emailAddress,
@@ -74,6 +74,13 @@ export default class UsersController {
 
   /*getAccessToken = async (authCode: string) => {
     return this.azureApi.getAccessToken(authCode);
+
+
+       TypeError: Cannot read property &#39;id&#39; of null
+       /Users/airon/Projects/Tark/Plun/plun-backend/src/controllers/users_controller.ts:64:23)
+       /Users/airon/Projects/Tark/Plun/plun-backend/src/controllers/users_controller.ts:5:58)
+
+
   }*/
 
   getProfile = async (token: string): Promise<User> => {

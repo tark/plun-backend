@@ -31,7 +31,7 @@ export default class UsersDb {
     L.i(`getByAzureProfileId - ${azureProfileId}`)
     const result = await this.users().where("azureProfileId", "==", azureProfileId).get()
 
-    if (!result.docs || !result.docs.length) {
+    if (result.empty) {
       return null
     }
 
@@ -46,9 +46,9 @@ export default class UsersDb {
   }
 
   add = async (user: User) : Promise<User> => {
-    L.i(`add - ${JSON.stringify(user.email)}`)
+    L.i(`add - ${user.email}`)
 
-    const existingUser = this.getByAzureProfileId(user.azureProfileId)
+    const existingUser = await this.getByAzureProfileId(user.azureProfileId)
     if (existingUser){
       return;
     }

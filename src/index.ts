@@ -60,7 +60,7 @@ app.use((req, res, next) => {
   }
 });
 
-app.listen(3001, () => console.log('Server running on port 3001'));
+app.listen(process.env.SERVER_PORT, () => console.log(`Server running on port ${process.env.SERVER_PORT}`));
 
 /**
  * First of all user try to auth just by id

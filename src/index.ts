@@ -48,18 +48,18 @@ app.use(cors());
 app.use(express.urlencoded({extended: true}));
 app.use(express.json());
 app.use((req, res, next) => {
-  // get auth header
-  const auth = req.headers.authorization?.split(' ')
-
-  // if auth header exists and this is the bearer one - return token, otherwise null
-  const token = (!!auth && auth[0] === 'Bearer') ? auth[1] : null
-
-  // token required for all non-public paths
-  if (!token && !publicEndpoints.includes(req.path)) {
-    return res.sendStatus(401)
-  }
-
   try {
+    // get auth header
+    const auth = req.headers.authorization?.split(' ')
+
+    // if auth header exists and this is the bearer one - return token, otherwise null
+    const token = (!!auth && auth[0] === 'Bearer') ? auth[1] : null
+
+    // token required for all non-public paths
+    if (!token && !publicEndpoints.includes(req.path)) {
+      return res.sendStatus(401)
+    }
+
     req.body.token = token
     next();
   } catch (e) {

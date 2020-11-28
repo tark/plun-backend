@@ -31,8 +31,11 @@ jobs:
           name: Install dependencies
           command: ssh circleci@$DEPLOY_SERVER 'cd /opt/plun-backend && yarn install'
       - run:
-          name: Deploy
-          command: ssh circleci@$DEPLOY_SERVER 'cd /opt/plun-backend && yarn build && nohup yarn start &'
+          name: Build
+          command: ssh circleci@$DEPLOY_SERVER 'cd /opt/plun-backend && yarn build'
+      - run:
+          name: Run
+          command: ssh circleci@$DEPLOY_SERVER 'cd /opt/plun-backend && nohup yarn start &'
 
 workflows:
   build-and-test:

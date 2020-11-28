@@ -311,7 +311,7 @@ app.get("/users", async (req, res, next) => {
 
 app.get("/ping", async (req, res, next) => {
   L.i(`get /ping`)
-  res.status(200).send('pong')
+  res.status(200).send('pong!')
 });
 
 const checkParameter = (parameterValue: any, parameterName: string) => {

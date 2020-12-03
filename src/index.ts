@@ -13,18 +13,21 @@ import {Express} from "express";
 import TasksController from "./controllers/tasks_controller";
 import PlansController from "./controllers/plans_controller";
 
+dotenv.config()
+
 const L = new Logger('index');
 
 firebase.initializeApp({
-  apiKey: "AIzaSyCt7wqBvDnVdJpLhnvUf35AGCCqp5Q79n0",
-  authDomain: "plun-io.firebaseapp.com",
-  databaseURL: "https://plun-io.firebaseio.com",
-  projectId: "plun-io",
-  storageBucket: "plun-io.appspot.com",
-  messagingSenderId: "1072198800950",
-  appId: "1:1072198800950:web:691bcd591d810fc60eaa97",
-  measurementId: "G-V897FVJEKK"
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.FIREBASE_DATABASE_URL,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
+  measurementId: process.env.FIREBASE_MEASUREMENT_ID,
 });
+
 const db = firebase.firestore();
 const nodeCache = new NodeCache();
 const cache = new Cache(nodeCache);
@@ -35,7 +38,6 @@ const tasksController = new TasksController(db, cache, azureApi, tasksRepository
 const plansController = new PlansController(db, cache, azureApi, tasksRepository);
 const usersController = new UsersController(db, cache, azureApi, plansController);
 
-dotenv.config()
 
 const publicEndpoints = [
   '/auth',

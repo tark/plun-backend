@@ -23,6 +23,11 @@ export default class UsersRepository {
     return this.usersDb.getByAzureProfileId(azureProfileId);
   }
 
+  getByEmail = (email: string): Promise<User> => {
+    L.i(`getByEmail - ${email}`)
+    return this.usersDb.getByEmail(email)
+  }
+
   add = async (user: User): Promise<User> => {
     L.i(`add - ${user}`)
     return this.usersDb.add(user);

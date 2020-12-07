@@ -164,6 +164,26 @@ export default class UsersController {
     return Promise.all(userIds.map(async (id) => this.usersRepository.get(id)))
   }
 
+  /**
+   * Returns all users for the given organization
+   * @param organizationName
+   * @param token
+   */
+  getAllUsers = async (organizationName: string, token: string): Promise<Array<User>> => {
+    L.i(`getAllUsers - ${organizationName}`)
+    this.checkToken(token)
+    const usersFromAzure = await this.azureApi.getUsersOfOrganization(organizationName, token)
+    // return users from azure merged with users from DB
+    // we are keeping in DB only those users who creates a plan
+    // azure users and azure profiles has different IDs
+    // so we are looking it by email
+    return Promise.all(usersFromAzure.map(async (usersFromAzure) => {
+      const userFromDb = await this.usersRepository.getByEmail(usersFromAzure.email)
+      return userFromDb ?? usersFromAzure
+    }))
+
+  }
+
   checkToken = (token: string) => {
     if (!token) {
       throw new UnauthorizedError();

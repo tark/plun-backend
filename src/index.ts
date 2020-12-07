@@ -296,9 +296,9 @@ app.patch("/plan", async (req, res, next) => {
 app.get("/users", async (req, res, next) => {
   try {
     const {token} = req.body;
-    const {organizationName, projectName} = req.query as any;
-    L.i(`get /users - ${organizationName}, ${projectName}`)
-    const users = await usersController.getUsers(organizationName, projectName, token)
+    const {organizationName} = req.query as any;
+    L.i(`get /users - ${organizationName}`)
+    const users = await usersController.getAllUsers(organizationName, token)
     L.i(`get /users - returning - ${users}`)
     res.status(200).json(users)
   } catch (e) {

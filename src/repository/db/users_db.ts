@@ -45,6 +45,24 @@ export default class UsersDb {
     };
   }
 
+  getByEmail = async (email: string): Promise<User> => {
+    L.i(`getByEmail - ${email}`)
+    const result = await this.users().where("email", "==", email).get()
+
+    if (result.empty) {
+      return null
+    }
+
+    const {name, email: userEmail, azureProfileId} = result.docs[0].data()
+
+    return {
+      id: result.docs[0].id,
+      azureProfileId,
+      name,
+      email: userEmail
+    };
+  }
+
   add = async (user: User) : Promise<User> => {
     L.i(`add - ${user.email}`)
 

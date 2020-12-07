@@ -8,11 +8,14 @@ import {AzureAuthResponse, AzureProfile, Organization, Project, Task} from "../m
 const L = new Logger('AzureApi');
 const baseUrl = 'https://app.vssps.visualstudio.com'
 const baseUrlDevAzure = 'https://dev.azure.com'
+const baseUrlGraph = 'https://vssps.dev.azure.com'
 const Endpoints = {
   token: `${baseUrl}/oauth2/token`,
   accounts: `${baseUrl}/_apis/accounts`,
   profile: `${baseUrl}/_apis/profile/profiles/me`,
   projects: `${baseUrl}/_apis/projects`,
+  users: `${baseUrlGraph}/{organization}/_apis/graph/users?api-version=6.0-preview.1
+`,
 }
 
 export default class AzureApi {
@@ -327,6 +330,31 @@ export default class AzureApi {
     return {
       'Authorization': `Bearer ${token}`,
     }
+  }
+
+  getUsersOfOrganization = async (organizationName: string, token: string) => {
+    L.i(`getUsersOfOrganization - ${organizationName}, ${token}`)
+
+    const result = await axios.get(
+      `${baseUrlGraph}/${organizationName}/_apis/graph/users`,
+      {headers: this.authHeader(token)}
+    )
+
+    if (!result.data.count || result.data.count == 0) {
+      return []
+    }
+
+    const users = result.data.value;
+
+    return users
+      // remove service users
+      .filter(u => u.origin !== 'vsts')
+      .map(u => ({
+        email: u.mailAddress,
+        name: u.displayName,
+        azureProfileId: u.originId,
+      }))
+
   }
 
 }

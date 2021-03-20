@@ -38,7 +38,6 @@ const tasksController = new TasksController(db, cache, azureApi, tasksRepository
 const plansController = new PlansController(db, cache, azureApi, tasksRepository);
 const usersController = new UsersController(db, cache, azureApi, plansController);
 
-
 const publicEndpoints = [
   '/auth',
   '/refreshToken',
@@ -194,7 +193,7 @@ app.get("/tasks-suggestions", async (req, res, next) => {
 /**
  * Create a plan for today
  */
-app.post('/plan', async (req, res, next) => {
+app.post('/plans', async (req, res, next) => {
 
   L.i(`post /plun`)
 
@@ -223,7 +222,7 @@ app.post('/plan', async (req, res, next) => {
  * Returns a PLUN :) for the given date
  * if the date is null - returns the nearest available previous plan
  */
-app.get("/plan", async (req, res, next) => {
+app.get('/plans', async (req, res, next) => {
   try {
     const {organizationName, projectName, date} = req.query as any;
     const {token} = req.body;
@@ -250,7 +249,7 @@ app.get("/plan", async (req, res, next) => {
 /**
  * Returns all the plans for all users for the given dates
  */
-app.get("/plans", async (req, res, next) => {
+app.get('/plans', async (req, res, next) => {
   try {
     const {organizationName, projectName, dateFrom, dateTo/*, userId*/} = req.query as any;
     const {token} = req.body;
@@ -276,7 +275,7 @@ app.get("/plans", async (req, res, next) => {
 /**
  * Update the task in a plan. Usually for changing the state.
  */
-app.patch("/plan", async (req, res, next) => {
+app.patch('/plan', async (req, res, next) => {
   try {
     const {plan, token} = req.body;
     L.i(`patch /plan - plan - ${JSON.stringify(plan)}`)
